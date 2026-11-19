@@ -4,6 +4,8 @@ on:
   workflow_dispatch:
   push:
     branches: [ "main", "feature/tiktok-rust-bridge", "fix/piratetok-event-stream", "fix/tiktok-username-config" ]
+  pull_request:
+    branches: [ "fix/piratetok-event-stream" ]
 
 jobs:
   test-and-build:
