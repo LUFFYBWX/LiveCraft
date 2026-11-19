@@ -101,6 +101,9 @@ where
 {
     let (mut write, mut read) = ws.split();
     info!("websocket connected");
+    tx.send(TikTokLiveEvent::Connected { room_id: session.room_id.to_string() })
+        .await
+        .map_err(|_| TikTokLiveError::ConnectionClosed)?;
     write.send(WsMessage::Binary(build_heartbeat(session.room_id)?.into())).await?;
     write.send(WsMessage::Binary(build_enter_room(session.room_id)?.into())).await?;
 
