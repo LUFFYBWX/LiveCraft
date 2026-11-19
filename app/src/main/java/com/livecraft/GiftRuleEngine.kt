@@ -33,10 +33,11 @@ class GiftRuleEngine(
         if (event.isCombo && !event.isStreakOver) return null
 
         val normalizedName = event.giftName.trim().lowercase()
+        // Named special gifts take priority over the generic value rule.
         val command = when {
-            event.diamondTotal > 100L || event.diamondTotal >= killThreshold -> "kill @p"
             normalizedName in roseNames -> "summon zombie ~ ~1 ~"
             normalizedName in dinosaurNames -> "summon wither ~ ~1 ~"
+            event.diamondTotal > 100L -> "kill @p"
             else -> return null
         }
 
