@@ -28,6 +28,22 @@ fn status(vm: &JavaVM, message: &str) {
     }
 }
 
+fn diagnostic(vm: &JavaVM, event_type: &str) {
+    if let Ok(mut env) = vm.attach_current_thread() {
+        if let (Ok(class), Ok(value)) = (
+            env.find_class("com/livecraft/GameBridgeService"),
+            env.new_string(event_type),
+        ) {
+            let _ = env.call_static_method(
+                class,
+                "onNativeTikTokDiagnostic",
+                "(Ljava/lang/String;)V",
+                &[JValue::Object(&value)],
+            );
+        }
+    }
+}
+
 fn chat(vm: &JavaVM, username: &str, comment: &str) {
     if let Ok(mut env) = vm.attach_current_thread() {
         if let (Ok(user), Ok(message), Ok(class)) = (
@@ -134,6 +150,9 @@ pub extern "system" fn Java_com_livecraft_TikTokNative_nativeStart(
                                             status(&vm, "Conexão com a LIVE encerrada. Tentando novamente...");
                                             reconnect = true;
                                             break;
+                                        }
+                                        Ok(TikTokLiveEvent::Unknown { method, .. }) => {
+                                            diagnostic(&vm, &method);
                                         }
                                         Ok(_) => {},
                                         Err(error) => {
