@@ -102,8 +102,8 @@ class GameBridgeService : Service() {
     }
 
     fun handleTikTokChat(username: String, comment: String): Boolean {
-        val safeUser = username.replace('\\r', ' ').replace('\\n', ' ').take(32)
-        val safeComment = comment.replace('\\r', ' ').replace('\\n', ' ').take(180)
+        val safeUser = username.replace('\r', ' ').replace('\n', ' ').take(32)
+        val safeComment = comment.replace('\r', ' ').replace('\n', ' ').take(180)
         if (safeComment.isBlank()) return false
         val text = "§b[$safeUser] §f$safeComment"
         val raw = JSONObject().put("rawtext", org.json.JSONArray().put(JSONObject().put("text", text)))
