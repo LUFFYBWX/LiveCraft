@@ -1,0 +1,25 @@
+[package]
+name = "livecraft-tiktok-core"
+version = "0.1.0"
+edition = "2021"
+license = "0BSD"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+prost = "0.14"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "signal"] }
+tokio-tungstenite = { version = "0.26", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "socks"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tracing = "0.1"
+flate2 = "1"
+urlencoding = "2"
+base64 = "0.22"
+rand = "0.9"
+http = "1"
+futures-util = "0.3"
