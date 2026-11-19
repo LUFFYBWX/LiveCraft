@@ -89,14 +89,28 @@ class MainActivity : Activity() {
                 generalStatus.text = "Digite seu usuário do TikTok antes de conectar."
             } else {
                 getSharedPreferences("livecraft", MODE_PRIVATE).edit().putString("tiktok_username", username).apply()
-                val i = Intent(this, GameBridgeService::class.java).setAction(GameBridgeService.ACTION_START)
+                val i = Intent(this, GameBridgeService::class.java).setAction(GameBridgeService.ACTION_START_TIKTOK)
                 if (Build.VERSION.SDK_INT >= 26) startForegroundService(i) else startService(i)
-                generalStatus.text = "Usuário @$username salvo. Procurando a LIVE..."
+                generalStatus.text = "Procurando a LIVE de @$username..."
             }
         })
-        root.addView(makeButton("PARAR LIVECRAFT") {
+        root.addView(makeButton("CONECTAR AO MINECRAFT") {
+            requestNotificationPermissionIfNeeded()
+            val i = Intent(this, GameBridgeService::class.java).setAction(GameBridgeService.ACTION_START_MINECRAFT)
+            if (Build.VERSION.SDK_INT >= 26) startForegroundService(i) else startService(i)
+            generalStatus.text = "Iniciando servidor local do Minecraft..."
+        })
+        root.addView(makeButton("DESCONECTAR DA LIVE") {
+            startService(Intent(this, GameBridgeService::class.java).setAction(GameBridgeService.ACTION_STOP_TIKTOK))
+            generalStatus.text = "Encerrando conexão com o TikTok..."
+        })
+        root.addView(makeButton("DESCONECTAR DO MINECRAFT") {
+            startService(Intent(this, GameBridgeService::class.java).setAction(GameBridgeService.ACTION_STOP_MINECRAFT))
+            generalStatus.text = "Encerrando conexão com o Minecraft..."
+        })
+        root.addView(makeButton("PARAR TUDO") {
             startService(Intent(this, GameBridgeService::class.java).setAction(GameBridgeService.ACTION_STOP))
-            generalStatus.text = "Desligando conexões..."
+            generalStatus.text = "Desligando todas as conexões..."
         })
         root.addView(space(8))
 
