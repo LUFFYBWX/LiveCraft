@@ -3,7 +3,7 @@ name: Build LiveCraft APK
 on:
   workflow_dispatch:
   push:
-    branches: [ "main", "feature/tiktok-rust-bridge" ]
+    branches: [ "main", "feature/tiktok-rust-bridge", "fix/piratetok-event-stream" ]
 
 jobs:
   test-and-build:
