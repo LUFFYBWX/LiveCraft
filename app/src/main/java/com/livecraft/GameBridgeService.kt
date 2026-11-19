@@ -77,6 +77,33 @@ class GameBridgeService : Service() {
         super.onDestroy()
     }
 
+    /**
+     * Entry point for the TikTok connector. The connector should call this once
+     * per finalized gift event (combo gifts only after streak completion).
+     */
+    fun handleTikTokGift(
+        giftName: String,
+        diamondTotal: Long,
+        isCombo: Boolean = false,
+        isStreakOver: Boolean = true
+    ): Boolean {
+        val action = GiftRuleEngine().handle(
+            LiveGiftEvent(
+                giftName = giftName,
+                diamondTotal = diamondTotal,
+                isCombo = isCombo,
+                isStreakOver = isStreakOver
+            )
+        ) ?: return false
+
+        val sent = sendCommand(action.command)
+        update(
+            if (sent) "Presente recebido: ${action.giftName}" else "Presente recebido, mas Minecraft desconectado",
+            "${action.giftName} (${action.diamondTotal} moedas) → ${action.command}"
+        )
+        return sent
+    }
+
     private fun update(status: String, line: String? = null) {
         sendBroadcast(Intent(ACTION_UPDATE).setPackage(packageName)
             .putExtra(EXTRA_STATUS, status).putExtra(EXTRA_LOG, line))
