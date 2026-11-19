@@ -1,0 +1,12 @@
+[package]
+name = "livecraft-tiktok-jni"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+jni = "0.21"
+tokio = { version = "1", features = ["rt-multi-thread", "time", "macros"] }
+livecraft-tiktok-core = { path = "../live-rs" }
