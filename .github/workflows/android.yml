@@ -32,7 +32,8 @@ jobs:
       - name: Build TikTok native connector
         run: |
           export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.2.12479018"
-          cargo ndk -t arm64-v8a -o app/src/main/jniLibs build --manifest-path native/jni/Cargo.toml --release
+          cd native/jni
+          cargo ndk -t arm64-v8a -o ../../app/src/main/jniLibs build --release
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
