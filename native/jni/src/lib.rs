@@ -107,6 +107,7 @@ pub extern "system" fn Java_com_livecraft_TikTokNative_nativeStart(
             }
         };
 
+        // Keep a separate VM handle for reporting panics after the worker future ends.
         let panic_vm = vm.clone();
         let worker_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             runtime.block_on(async move {
