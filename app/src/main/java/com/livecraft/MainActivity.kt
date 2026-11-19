@@ -96,7 +96,7 @@ class MainActivity : Activity() {
             setPadding(0, 8, 0, 0)
         }
 
-        listOf(title, subtitle, tiktokUsername, status, start, stop, test, instructions, heading, log).forEach {
+        listOf(title, subtitle, tiktokUsername, status, start, stop, test, testChat, instructions, heading, log).forEach {
             layout.addView(it)
         }
         setContentView(ScrollView(this).apply { addView(layout) })
