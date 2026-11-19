@@ -64,7 +64,10 @@ pub extern "system" fn Java_com_livecraft_TikTokNative_nativeStart(mut env: JNIE
             while RUNNING.load(Ordering::SeqCst) {
                 tokio::select! {
                     result = stream.next_event() => match result {
-                        Ok(TikTokLiveEvent::Chat(event)) => {\n                            let author = event.user.as_ref().map(|user| if !user.nickname.is_empty() { user.nickname.as_str() } else { user.unique_id.as_str() }).unwrap_or("TikTok");\n                            chat(&vm, author, &event.comment);\n                        }\n                        Ok(TikTokLiveEvent::Gift(event)) => {
+                        Ok(TikTokLiveEvent::Chat(event)) => {
+                            let author = event.user.as_ref().map(|user| if !user.nickname.is_empty() { user.nickname.as_str() } else { user.unique_id.as_str() }).unwrap_or("TikTok");
+                            chat(&vm, author, &event.comment);
+                        }\n                        Ok(TikTokLiveEvent::Gift(event)) => {
                             let name = event.gift_details.as_ref().map(|details| details.gift_name.as_str()).unwrap_or("Presente");
                             gift(&vm, name, event.diamond_total(), event.is_combo_gift(), event.is_streak_over());
                         }
