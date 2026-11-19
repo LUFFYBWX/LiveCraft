@@ -16,6 +16,20 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Set up Android SDK and NDK
+        uses: android-actions/setup-android@v3
+      - name: Install Android NDK
+        run: sdkmanager "ndk;27.2.12479018"
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk
+      - name: Build TikTok native connector
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.2.12479018"
+          cargo ndk -t arm64-v8a -o app/src/main/jniLibs build --manifest-path native/jni/Cargo.toml --release
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
