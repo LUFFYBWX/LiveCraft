@@ -46,7 +46,14 @@ class GameBridgeService : Service() {
 
         try {
             server = MinecraftSocketServer().also { it.start() }
-            update("Servidor ativo em 127.0.0.1:8765", "Servidor WebSocket iniciado.")
+            val username = getSharedPreferences("livecraft", MODE_PRIVATE)
+                .getString("tiktok_username", "")?.trim()?.removePrefix("@").orEmpty()
+            if (username.isNotBlank()) {
+                TikTokNative.start(username)
+                update("Servidor ativo. Conectando ao TikTok...", "Conector iniciado para @$username")
+            } else {
+                update("Servidor ativo. Informe seu usuário do TikTok.", "Usuário do TikTok não configurado.")
+            }
         } catch (e: Exception) {
             update("Falha ao iniciar: ${e.message}", "Erro ao iniciar servidor.")
             stopSelf()
@@ -54,6 +61,7 @@ class GameBridgeService : Service() {
     }
 
     private fun stopBridge() {
+        TikTokNative.nativeStop()
         try { server?.stop(500) } catch (_: Exception) {}
         server = null
         update("Servidor parado", "Conexão encerrada.")
@@ -71,6 +79,7 @@ class GameBridgeService : Service() {
     }
 
     override fun onDestroy() {
+        TikTokNative.nativeStop()
         try { server?.stop(500) } catch (_: Exception) {}
         server = null
         instance = null
@@ -173,6 +182,11 @@ class GameBridgeService : Service() {
             isStreakOver: Boolean
         ) {
             instance?.handleTikTokGift(giftName, diamondTotal, isCombo, isStreakOver)
+        }
+
+        @JvmStatic
+        fun onNativeTikTokChat(username: String, comment: String) {
+            instance?.handleTikTokChat(username, comment)
         }
 
         @JvmStatic
