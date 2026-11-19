@@ -22,8 +22,7 @@ data class GiftAction(
 
 class GiftRuleEngine(
     private val roseNames: Set<String> = setOf("rose"),
-    private val dinosaurNames: Set<String> = setOf("dinosaur"),
-    private val killThreshold: Long = 101L
+    private val dinosaurNames: Set<String> = setOf("dinosaur")
 ) {
     /**
      * Returns null for unfinished combo events or gifts without a configured action.
