@@ -147,6 +147,25 @@ class GameBridgeService : Service() {
         @Volatile private var connected: WebSocket? = null
         @Volatile private var instance: GameBridgeService? = null
 
+        /**
+         * Stable JNI callback surface for the native TikTok event stream.
+         * Gift events are routed through the same rule engine as any future connector.
+         */
+        @JvmStatic
+        fun onNativeTikTokGift(
+            giftName: String,
+            diamondTotal: Long,
+            isCombo: Boolean,
+            isStreakOver: Boolean
+        ) {
+            instance?.handleTikTokGift(giftName, diamondTotal, isCombo, isStreakOver)
+        }
+
+        @JvmStatic
+        fun onNativeTikTokStatus(message: String) {
+            instance?.update(message, message)
+        }
+
         fun sendCommand(command: String): Boolean {
             val socket = connected ?: return false
             if (!socket.isOpen) return false
