@@ -92,8 +92,7 @@ impl TikTokLiveBuilder {
         let room_id = fetch_room_id(&config.username, config.fetch_params()).await?.room_id;
 
         let (tx, rx) = mpsc::channel(256);
-        emit(&tx, TikTokLiveEvent::Connected { room_id: room_id.clone() }).await?;
-
+        // "Connected" is emitted only after the WebSocket handshake succeeds.
         let task = tokio::spawn(supervise(config, room_id, tx));
         Ok(TikTokLiveStream { rx, task })
     }
