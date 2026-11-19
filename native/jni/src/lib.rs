@@ -107,6 +107,7 @@ pub extern "system" fn Java_com_livecraft_TikTokNative_nativeStart(
             }
         };
 
+        let panic_vm = vm.clone();
         let worker_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             runtime.block_on(async move {
             let mut retry: u32 = 0;
@@ -197,7 +198,7 @@ pub extern "system" fn Java_com_livecraft_TikTokNative_nativeStart(
                 .map(String::as_str)
                 .or_else(|| payload.downcast_ref::<&str>().copied())
                 .unwrap_or("falha interna inesperada no conector");
-            status(&vm, &format!("O conector TikTok encontrou uma falha: {reason}"));
+            status(&panic_vm, &format!("O conector TikTok encontrou uma falha: {reason}"));
         }
     });
 }
