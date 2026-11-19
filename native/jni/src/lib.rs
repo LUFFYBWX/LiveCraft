@@ -16,6 +16,19 @@ fn status(vm: &JavaVM, message: &str) {
     }
 }
 
+fn chat(vm: &JavaVM, username: &str, comment: &str) {
+    if let Ok(mut env) = vm.attach_current_thread() {
+        if let (Ok(user), Ok(message), Ok(class)) = (
+            env.new_string(username),
+            env.new_string(comment),
+            env.find_class("com/livecraft/GameBridgeService"),
+        ) {
+            let _ = env.call_static_method(class, "onNativeTikTokChat", "(Ljava/lang/String;Ljava/lang/String;)V",
+                &[JValue::Object(&user), JValue::Object(&message)]);
+        }
+    }
+}
+
 fn gift(vm: &JavaVM, name: &str, coins: i64, combo: bool, streak_over: bool) {
     if let Ok(mut env) = vm.attach_current_thread() {
         if let (Ok(class), Ok(value)) = (env.find_class("com/livecraft/GameBridgeService"), env.new_string(name)) {
@@ -47,11 +60,11 @@ pub extern "system" fn Java_com_livecraft_TikTokNative_nativeStart(mut env: JNIE
                 Ok(value) => value,
                 Err(error) => { status(&vm, &format!("Erro TikTok: {error}")); RUNNING.store(false, Ordering::SeqCst); return; }
             };
-            status(&vm, &format!("Conectado à live de @{username}. Aguardando presentes."));
+            status(&vm, &format!("Conectado à live de @{username}. Aguardando comentários e presentes."));
             while RUNNING.load(Ordering::SeqCst) {
                 tokio::select! {
                     result = stream.next_event() => match result {
-                        Ok(TikTokLiveEvent::Gift(event)) => {
+                        Ok(TikTokLiveEvent::Chat(event)) => {\n                            let author = event.user.as_ref().map(|user| if !user.nickname.is_empty() { user.nickname.as_str() } else { user.unique_id.as_str() }).unwrap_or("TikTok");\n                            chat(&vm, author, &event.comment);\n                        }\n                        Ok(TikTokLiveEvent::Gift(event)) => {
                             let name = event.gift_details.as_ref().map(|details| details.gift_name.as_str()).unwrap_or("Presente");
                             gift(&vm, name, event.diamond_total(), event.is_combo_gift(), event.is_streak_over());
                         }
