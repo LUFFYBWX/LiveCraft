@@ -180,6 +180,11 @@ class GameBridgeService : Service() {
             instance?.update(message, message)
         }
 
+        fun sendChatMessageForTest(): Boolean {
+            val raw = JSONObject().put("rawtext", org.json.JSONArray().put(JSONObject().put("text", "§a[LiveCraft] §fComentário de teste")))
+            return sendCommand("tellraw @a $raw")
+        }
+
         fun sendCommand(command: String): Boolean {
             val socket = connected ?: return false
             if (!socket.isOpen) return false
