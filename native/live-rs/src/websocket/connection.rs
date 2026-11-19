@@ -193,6 +193,12 @@ where
         }
         other => {
             debug!("payload type {other}");
+            tx.send(TikTokLiveEvent::Unknown {
+                method: format!("payload_type:{other}"),
+                payload: frame.payload,
+            })
+            .await
+            .map_err(|_| TikTokLiveError::ConnectionClosed)?;
             return Ok(());
         }
     }

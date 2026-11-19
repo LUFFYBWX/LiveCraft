@@ -214,6 +214,11 @@ class GameBridgeService : Service() {
             instance?.update(message, message)
         }
 
+        @JvmStatic
+        fun onNativeTikTokDiagnostic(eventType: String) {
+            instance?.update(currentStatus, "Evento TikTok recebido, mas ainda não mapeado: $eventType")
+        }
+
         fun sendChatMessageForTest(): Boolean {
             val raw = JSONObject().put("rawtext", org.json.JSONArray().put(JSONObject().put("text", "§a[LiveCraft] §fComentário de teste")))
             return sendCommand("tellraw @a $raw")
