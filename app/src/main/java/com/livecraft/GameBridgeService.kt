@@ -13,6 +13,7 @@ import java.util.UUID
 
 class GameBridgeService : Service() {
     private var server: MinecraftSocketServer? = null
+    private var activeTikTokUsername: String? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -25,7 +26,6 @@ class GameBridgeService : Service() {
     }
 
     private fun startBridge() {
-        if (server != null) return
         createNotificationChannel()
         val notification = if (Build.VERSION.SDK_INT >= 26) {
             Notification.Builder(this, CHANNEL_ID)
@@ -45,15 +45,33 @@ class GameBridgeService : Service() {
         else startForeground(1, notification)
 
         try {
-            server = MinecraftSocketServer().also { it.start() }
-            tiktokConnected = false
+            if (server == null) {
+                server = MinecraftSocketServer().also { it.start() }
+            }
+
             val username = getSharedPreferences("livecraft", MODE_PRIVATE)
                 .getString("tiktok_username", "")?.trim()?.removePrefix("@").orEmpty()
-            if (username.isNotBlank()) {
-                TikTokNative.start(username)
-                update("Servidor ativo. Conectando ao TikTok...", "Conector iniciado para @$username")
-            } else {
+
+            if (username.isBlank()) {
+                stopTikTokConnector()
                 update("Servidor ativo. Informe seu usuário do TikTok.", "Usuário do TikTok não configurado.")
+                return
+            }
+
+            if (activeTikTokUsername != username) {
+                stopTikTokConnector()
+                try {
+                    TikTokNative.start(username)
+                    activeTikTokUsername = username
+                    tiktokConnected = false
+                    update("Servidor ativo. Localizando a LIVE de @$username...", "Conector TikTok iniciado.")
+                } catch (error: Throwable) {
+                    activeTikTokUsername = null
+                    tiktokConnected = false
+                    update("Falha ao iniciar o conector TikTok: ${error.message ?: error.javaClass.simpleName}", "Verifique a instalação do aplicativo.")
+                }
+            } else {
+                update("LiveCraft ativo. Mantendo conexão de @$username.", "Conector TikTok já está em execução.")
             }
         } catch (e: Exception) {
             update("Falha ao iniciar: ${e.message}", "Erro ao iniciar servidor.")
@@ -62,13 +80,23 @@ class GameBridgeService : Service() {
     }
 
     private fun stopBridge() {
-        TikTokNative.nativeStop()
+        stopTikTokConnector()
         tiktokConnected = false
         try { server?.stop(500) } catch (_: Exception) {}
         server = null
         update("Servidor parado", "Conexão encerrada.")
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
+    }
+
+    private fun stopTikTokConnector() {
+        try {
+            TikTokNative.nativeStop()
+        } catch (_: Throwable) {
+            // The app may have been installed without the native library.
+        }
+        activeTikTokUsername = null
+        tiktokConnected = false
     }
 
     private fun createNotificationChannel() {
@@ -81,7 +109,7 @@ class GameBridgeService : Service() {
     }
 
     override fun onDestroy() {
-        TikTokNative.nativeStop()
+        stopTikTokConnector()
         tiktokConnected = false
         try { server?.stop(500) } catch (_: Exception) {}
         server = null
