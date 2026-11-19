@@ -144,6 +144,7 @@ class GameBridgeService : Service() {
     }
 
     private fun update(status: String, line: String? = null) {
+        currentStatus = status
         sendBroadcast(Intent(ACTION_UPDATE).setPackage(packageName)
             .putExtra(EXTRA_STATUS, status)
             .putExtra(EXTRA_LOG, line)
@@ -182,9 +183,19 @@ class GameBridgeService : Service() {
         private const val CHANNEL_ID = "livecraft_service"
         private const val PORT = 8765
 
+        @Volatile private var currentStatus: String = "Aguardando você iniciar."
         @Volatile private var connected: WebSocket? = null
         @Volatile private var instance: GameBridgeService? = null
         @Volatile private var tiktokConnected: Boolean = false
+
+        fun publishCurrentState(context: android.content.Context) {
+            context.sendBroadcast(
+                Intent(ACTION_UPDATE).setPackage(context.packageName)
+                    .putExtra(EXTRA_STATUS, currentStatus)
+                    .putExtra(EXTRA_MINECRAFT_CONNECTED, connected?.isOpen == true)
+                    .putExtra(EXTRA_TIKTOK_CONNECTED, tiktokConnected)
+            )
+        }
 
         @JvmStatic
         fun onNativeTikTokGift(giftName: String, diamondTotal: Long, isCombo: Boolean, isStreakOver: Boolean) {
