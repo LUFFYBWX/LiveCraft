@@ -77,6 +77,11 @@ class MainActivity : Activity() {
             else status.text = "Comando enviado! Confira o Minecraft."
         }
 
+        val testChat = makeButton("TESTAR: ENVIAR COMENTÁRIO NO CHAT") {
+            val ok = GameBridgeService.sendChatMessageForTest()
+            status.text = if (ok) "Comentário de teste enviado! Confira o chat do Minecraft." else "Minecraft ainda não está conectado"
+        }
+
         val instructions = TextView(this).apply {
             text = "PASSOS NO MINECRAFT\n1. Abra um mundo próprio com cheats ativados.\n2. Ative WebSockets nas configurações, se essa opção aparecer.\n3. No chat, conecte usando:\n/connect 127.0.0.1:8765\n4. Volte ao LiveCraft e toque em TESTAR."
             textSize = 14f
