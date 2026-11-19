@@ -73,13 +73,26 @@ class MainActivity : Activity() {
         root.addView(space(8))
 
         root.addView(sectionTitle("CONTROLES"))
-        root.addView(makeButton("INICIAR LIVECRAFT") {
+        root.addView(makeButton("SALVAR USUÁRIO") {
+            val username = tiktokUsername.text.toString().trim().removePrefix("@").trim()
+            if (username.isBlank()) {
+                generalStatus.text = "Digite seu usuário do TikTok antes de salvar."
+            } else {
+                getSharedPreferences("livecraft", MODE_PRIVATE).edit().putString("tiktok_username", username).apply()
+                generalStatus.text = "Usuário configurado: @$username. Agora você pode conectar à LIVE."
+            }
+        })
+        root.addView(makeButton("CONECTAR À LIVE") {
             requestNotificationPermissionIfNeeded()
-            val username = tiktokUsername.text.toString().trim().removePrefix("@")
-            getSharedPreferences("livecraft", MODE_PRIVATE).edit().putString("tiktok_username", username).apply()
-            val i = Intent(this, GameBridgeService::class.java).setAction(GameBridgeService.ACTION_START)
-            if (Build.VERSION.SDK_INT >= 26) startForegroundService(i) else startService(i)
-            generalStatus.text = "Iniciando conexões..."
+            val username = tiktokUsername.text.toString().trim().removePrefix("@").trim()
+            if (username.isBlank()) {
+                generalStatus.text = "Digite seu usuário do TikTok antes de conectar."
+            } else {
+                getSharedPreferences("livecraft", MODE_PRIVATE).edit().putString("tiktok_username", username).apply()
+                val i = Intent(this, GameBridgeService::class.java).setAction(GameBridgeService.ACTION_START)
+                if (Build.VERSION.SDK_INT >= 26) startForegroundService(i) else startService(i)
+                generalStatus.text = "Usuário @$username salvo. Procurando a LIVE..."
+            }
         })
         root.addView(makeButton("PARAR LIVECRAFT") {
             startService(Intent(this, GameBridgeService::class.java).setAction(GameBridgeService.ACTION_STOP))
