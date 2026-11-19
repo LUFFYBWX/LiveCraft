@@ -104,6 +104,20 @@ class GameBridgeService : Service() {
         return sent
     }
 
+    fun handleTikTokChat(username: String, comment: String): Boolean {
+        val safeUser = username.replace(Regex("[\\\\r\\\\n]"), " ").take(32)
+        val safeComment = comment.replace(Regex("[\\\\r\\\\n]"), " ").take(180)
+        if (safeComment.isBlank()) return false
+        val text = "§b[$safeUser] §f$safeComment"
+        val raw = JSONObject().put("rawtext", org.json.JSONArray().put(JSONObject().put("text", text)))
+        val sent = sendCommand("tellraw @a $raw")
+        update(
+            if (sent) "Comentário recebido: $safeUser" else "Comentário recebido, mas Minecraft desconectado",
+            "$safeUser: $safeComment"
+        )
+        return sent
+    }
+
     private fun update(status: String, line: String? = null) {
         sendBroadcast(Intent(ACTION_UPDATE).setPackage(packageName)
             .putExtra(EXTRA_STATUS, status).putExtra(EXTRA_LOG, line))
