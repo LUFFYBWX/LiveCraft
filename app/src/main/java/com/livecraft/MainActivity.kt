@@ -13,6 +13,7 @@ import android.graphics.Typeface
 class MainActivity : Activity() {
     private lateinit var status: TextView
     private lateinit var log: TextView
+    private lateinit var tiktokUsername: EditText
     private var receiverRegistered = false
 
     private val receiver = object : BroadcastReceiver() {
@@ -50,8 +51,18 @@ class MainActivity : Activity() {
             setPadding(0, 28, 0, 16)
         }
 
+        tiktokUsername = EditText(this).apply {
+            hint = "Usuário do TikTok (sem @)"
+            setSingleLine(true)
+            setTextColor(0xFFFFFFFF.toInt())
+            setHintTextColor(0xFF8D95A8.toInt())
+            setText(getSharedPreferences("livecraft", MODE_PRIVATE).getString("tiktok_username", "") ?: "")
+        }
+
         val start = makeButton("INICIAR CONEXÃO LOCAL") {
             requestNotificationPermissionIfNeeded()
+            val username = tiktokUsername.text.toString().trim().removePrefix("@")
+            getSharedPreferences("livecraft", MODE_PRIVATE).edit().putString("tiktok_username", username).apply()
             val i = Intent(this, GameBridgeService::class.java).setAction(GameBridgeService.ACTION_START)
             if (Build.VERSION.SDK_INT >= 26) startForegroundService(i) else startService(i)
             status.text = "Iniciando servidor..."
@@ -85,7 +96,7 @@ class MainActivity : Activity() {
             setPadding(0, 8, 0, 0)
         }
 
-        listOf(title, subtitle, status, start, stop, test, instructions, heading, log).forEach {
+        listOf(title, subtitle, tiktokUsername, status, start, stop, test, instructions, heading, log).forEach {
             layout.addView(it)
         }
         setContentView(ScrollView(this).apply { addView(layout) })
