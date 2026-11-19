@@ -21,36 +21,45 @@ pub fn parse_room_id(username: &str, http_status: u16, body: &str) -> Result<Roo
         Ok(json) => json,
         Err(e) => return Err(TikTokLiveError::TikTokBlocked(format!("non-JSON response (http {http_status}): {e}"))),
     };
-    let Some(code) = json.get("statusCode").and_then(Value::as_i64) else {
-        return Err(TikTokLiveError::invalid("no statusCode in response"));
+    let Some(code) = number_or_numeric_string(json.get("statusCode")) else {
+        return Err(TikTokLiveError::invalid(format!("no valid statusCode in response (http {http_status})")));
     };
     match code {
         0 => {}
         19881007 => return Err(TikTokLiveError::UserNotFound(username.to_string())),
         other => return Err(TikTokLiveError::ApiError(other)),
     }
-    let Some(room_id) = json.pointer("/data/user/roomId").and_then(Value::as_str) else {
-        return Err(TikTokLiveError::RoomIdMissing);
-    };
-    if room_id.is_empty() || room_id == "0" {
-        return Err(TikTokLiveError::HostNotOnline("no active room".into()));
-    }
-    let status = live_status(&json)?;
+    let room_id = json_scalar_string(json.pointer("/data/user/roomId"))
+        .or_else(|| json_scalar_string(json.pointer("/data/liveRoom/roomId")))
+        .filter(|id| !id.is_empty() && id != "0")
+        .ok_or_else(|| TikTokLiveError::invalid(format!("roomId missing or invalid (http {http_status}, statusCode={code})")))?;
+    let status = live_status(&json).map_err(|_| TikTokLiveError::HostNotOnline(format!("live status missing (http {http_status}, statusCode={code})")))?;
     if status != 2 {
         return Err(TikTokLiveError::HostNotOnline(format!("status={status}")));
     }
     Ok(RoomIdResponse {
-        room_id: room_id.to_string(),
+        room_id,
         anchor_id: json_str(&json, "/data/user/id"),
+    })
+}
+
+fn number_or_numeric_string(value: Option<&Value>) -> Option<i64> {
+    value.and_then(|v| v.as_i64().or_else(|| v.as_str()?.parse::<i64>().ok()))
+}
+
+fn json_scalar_string(value: Option<&Value>) -> Option<String> {
+    value.and_then(|v| match v {
+        Value::String(s) => Some(s.clone()),
+        Value::Number(n) => Some(n.to_string()),
+        _ => None,
     })
 }
 
 fn live_status(json: &Value) -> Result<i64, TikTokLiveError> {
     for pointer in ["/data/liveRoom/status", "/data/user/status"] {
-        let Some(status) = json.pointer(pointer).and_then(Value::as_i64) else {
-            continue;
-        };
-        return Ok(status);
+        if let Some(status) = number_or_numeric_string(json.pointer(pointer)) {
+            return Ok(status);
+        }
     }
     Err(TikTokLiveError::HostNotOnline("no live status in response".into()))
 }
