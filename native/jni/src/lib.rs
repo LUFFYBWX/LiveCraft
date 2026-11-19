@@ -2,6 +2,7 @@ use jni::objects::{JClass, JString, JValue};
 use jni::sys::jboolean;
 use jni::{JNIEnv, JavaVM};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use std::thread;
 use tokio::time::{sleep, Duration};
 use livecraft_tiktok_core::{TikTokLive, structs::TikTokLiveEvent};
@@ -98,6 +99,7 @@ pub extern "system" fn Java_com_livecraft_TikTokNative_nativeStart(
         Err(_) => return,
     };
 
+    let vm = Arc::new(vm);
     thread::spawn(move || {
         let runtime = match tokio::runtime::Builder::new_multi_thread().enable_all().build() {
             Ok(value) => value,
@@ -108,7 +110,7 @@ pub extern "system" fn Java_com_livecraft_TikTokNative_nativeStart(
         };
 
         // Keep a separate VM handle for reporting panics after the worker future ends.
-        let panic_vm = vm.clone();
+        let panic_vm = Arc::clone(&vm);
         let worker_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             runtime.block_on(async move {
             let mut retry: u32 = 0;
