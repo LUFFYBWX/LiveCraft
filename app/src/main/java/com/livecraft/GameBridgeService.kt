@@ -46,6 +46,7 @@ class GameBridgeService : Service() {
 
         try {
             server = MinecraftSocketServer().also { it.start() }
+            tiktokConnected = false
             val username = getSharedPreferences("livecraft", MODE_PRIVATE)
                 .getString("tiktok_username", "")?.trim()?.removePrefix("@").orEmpty()
             if (username.isNotBlank()) {
@@ -62,6 +63,7 @@ class GameBridgeService : Service() {
 
     private fun stopBridge() {
         TikTokNative.nativeStop()
+        tiktokConnected = false
         try { server?.stop(500) } catch (_: Exception) {}
         server = null
         update("Servidor parado", "Conexão encerrada.")
@@ -80,31 +82,17 @@ class GameBridgeService : Service() {
 
     override fun onDestroy() {
         TikTokNative.nativeStop()
+        tiktokConnected = false
         try { server?.stop(500) } catch (_: Exception) {}
         server = null
         instance = null
         super.onDestroy()
     }
 
-    /**
-     * Entry point for the TikTok connector. The connector should call this once
-     * per finalized gift event (combo gifts only after streak completion).
-     */
-    fun handleTikTokGift(
-        giftName: String,
-        diamondTotal: Long,
-        isCombo: Boolean = false,
-        isStreakOver: Boolean = true
-    ): Boolean {
+    fun handleTikTokGift(giftName: String, diamondTotal: Long, isCombo: Boolean = false, isStreakOver: Boolean = true): Boolean {
         val action = GiftRuleEngine().handle(
-            LiveGiftEvent(
-                giftName = giftName,
-                diamondTotal = diamondTotal,
-                isCombo = isCombo,
-                isStreakOver = isStreakOver
-            )
+            LiveGiftEvent(giftName = giftName, diamondTotal = diamondTotal, isCombo = isCombo, isStreakOver = isStreakOver)
         ) ?: return false
-
         val sent = sendCommand(action.command)
         update(
             if (sent) "Presente recebido: ${action.giftName}" else "Presente recebido, mas Minecraft desconectado",
@@ -114,8 +102,8 @@ class GameBridgeService : Service() {
     }
 
     fun handleTikTokChat(username: String, comment: String): Boolean {
-        val safeUser = username.replace('\r', ' ').replace('\n', ' ').take(32)
-        val safeComment = comment.replace('\r', ' ').replace('\n', ' ').take(180)
+        val safeUser = username.replace('\\r', ' ').replace('\\n', ' ').take(32)
+        val safeComment = comment.replace('\\r', ' ').replace('\\n', ' ').take(180)
         if (safeComment.isBlank()) return false
         val text = "§b[$safeUser] §f$safeComment"
         val raw = JSONObject().put("rawtext", org.json.JSONArray().put(JSONObject().put("text", text)))
@@ -129,30 +117,27 @@ class GameBridgeService : Service() {
 
     private fun update(status: String, line: String? = null) {
         sendBroadcast(Intent(ACTION_UPDATE).setPackage(packageName)
-            .putExtra(EXTRA_STATUS, status).putExtra(EXTRA_LOG, line))
+            .putExtra(EXTRA_STATUS, status)
+            .putExtra(EXTRA_LOG, line)
+            .putExtra(EXTRA_MINECRAFT_CONNECTED, connected?.isOpen == true)
+            .putExtra(EXTRA_TIKTOK_CONNECTED, tiktokConnected))
     }
 
-    private inner class MinecraftSocketServer :
-        WebSocketServer(InetSocketAddress("127.0.0.1", PORT)) {
-
+    private inner class MinecraftSocketServer : WebSocketServer(InetSocketAddress("127.0.0.1", PORT)) {
         override fun onStart() {
-            update("Servidor ativo. Abra o Minecraft e conecte.", "Aguardando Minecraft em ws://127.0.0.1:$PORT")
+            update("Servidor local iniciado. Abra o Minecraft e conecte.", "Aguardando Minecraft em ws://127.0.0.1:$PORT")
         }
-
         override fun onOpen(conn: WebSocket, handshake: ClientHandshake) {
             connected = conn
             update("Minecraft conectado!", "Minecraft conectou ao LiveCraft.")
         }
-
         override fun onMessage(conn: WebSocket, message: String) {
             update("Minecraft conectado!", "Resposta do Minecraft: ${message.take(180)}")
         }
-
         override fun onClose(conn: WebSocket, code: Int, reason: String, remote: Boolean) {
             if (connected === conn) connected = null
             update("Minecraft desconectado", "Conexão encerrada ($code).")
         }
-
         override fun onError(conn: WebSocket?, ex: Exception) {
             update("Erro na conexão", ex.message ?: "Erro WebSocket")
         }
@@ -164,23 +149,17 @@ class GameBridgeService : Service() {
         const val ACTION_UPDATE = "com.livecraft.UPDATE"
         const val EXTRA_STATUS = "status"
         const val EXTRA_LOG = "log"
+        const val EXTRA_MINECRAFT_CONNECTED = "minecraft_connected"
+        const val EXTRA_TIKTOK_CONNECTED = "tiktok_connected"
         private const val CHANNEL_ID = "livecraft_service"
         private const val PORT = 8765
 
         @Volatile private var connected: WebSocket? = null
         @Volatile private var instance: GameBridgeService? = null
+        @Volatile private var tiktokConnected: Boolean = false
 
-        /**
-         * Stable JNI callback surface for the native TikTok event stream.
-         * Gift events are routed through the same rule engine as any future connector.
-         */
         @JvmStatic
-        fun onNativeTikTokGift(
-            giftName: String,
-            diamondTotal: Long,
-            isCombo: Boolean,
-            isStreakOver: Boolean
-        ) {
+        fun onNativeTikTokGift(giftName: String, diamondTotal: Long, isCombo: Boolean, isStreakOver: Boolean) {
             instance?.handleTikTokGift(giftName, diamondTotal, isCombo, isStreakOver)
         }
 
@@ -191,6 +170,8 @@ class GameBridgeService : Service() {
 
         @JvmStatic
         fun onNativeTikTokStatus(message: String) {
+            val lower = message.lowercase()
+            tiktokConnected = lower.startsWith("conectado à live") || lower.startsWith("conectado a live")
             instance?.update(message, message)
         }
 
@@ -215,10 +196,7 @@ class GameBridgeService : Service() {
                     put("origin", JSONObject().put("type", "player"))
                 })
             }
-            return try {
-                socket.send(packet.toString())
-                true
-            } catch (_: Exception) { false }
+            return try { socket.send(packet.toString()); true } catch (_: Exception) { false }
         }
     }
 
