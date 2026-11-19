@@ -34,7 +34,10 @@ class MainActivity : Activity() {
             )
             generalStatus.text = intent.getStringExtra(GameBridgeService.EXTRA_STATUS) ?: "Aguardando..."
             val line = intent.getStringExtra(GameBridgeService.EXTRA_LOG)
-            if (!line.isNullOrBlank()) log.text = "$line\n" + log.text
+            if (!line.isNullOrBlank()) {
+                val previous = log.text.toString().lineSequence().take(11).joinToString("\n")
+                log.text = "$line\n$previous"
+            }
         }
     }
 
@@ -115,7 +118,7 @@ class MainActivity : Activity() {
     }
 
     private fun connectionRow(name: String): TextView = TextView(this).apply {
-        text = "✕  $name: DESCONNECTED"
+        text = "✕  $name: DESCONECTADO"
         textSize = 16f
         typeface = Typeface.DEFAULT_BOLD
         setTextColor(0xFFFF6B6B.toInt())
@@ -168,6 +171,7 @@ class MainActivity : Activity() {
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(receiver, filter, RECEIVER_NOT_EXPORTED)
         else @Suppress("DEPRECATION") registerReceiver(receiver, filter)
         receiverRegistered = true
+        GameBridgeService.publishCurrentState(this)
     }
 
     override fun onStop() {
