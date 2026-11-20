@@ -16,7 +16,8 @@ fn is_current(generation: u64) -> bool {
 fn status(vm: &JavaVM, class: &GlobalRef, message: &str) {
     if let Ok(mut env) = vm.attach_current_thread() {
         if let Ok(value) = env.new_string(message) {
-            let _ = env.call_static_method(class.as_obj(), "onNativeTikTokStatus", "(Ljava/lang/String;)V", &[JValue::Object(&value)]);
+            let class = JClass::from(class.as_obj());
+            let _ = env.call_static_method(class, "onNativeTikTokStatus", "(Ljava/lang/String;)V", &[JValue::Object(&value)]);
         }
     }
 }
@@ -24,7 +25,8 @@ fn status(vm: &JavaVM, class: &GlobalRef, message: &str) {
 fn diagnostic(vm: &JavaVM, class: &GlobalRef, event_type: &str) {
     if let Ok(mut env) = vm.attach_current_thread() {
         if let Ok(value) = env.new_string(event_type) {
-            let _ = env.call_static_method(class.as_obj(), "onNativeTikTokDiagnostic", "(Ljava/lang/String;)V", &[JValue::Object(&value)]);
+            let class = JClass::from(class.as_obj());
+            let _ = env.call_static_method(class, "onNativeTikTokDiagnostic", "(Ljava/lang/String;)V", &[JValue::Object(&value)]);
         }
     }
 }
@@ -32,7 +34,8 @@ fn diagnostic(vm: &JavaVM, class: &GlobalRef, event_type: &str) {
 fn chat(vm: &JavaVM, class: &GlobalRef, username: &str, comment: &str) {
     if let Ok(mut env) = vm.attach_current_thread() {
         if let (Ok(user), Ok(message)) = (env.new_string(username), env.new_string(comment)) {
-            let _ = env.call_static_method(class.as_obj(), "onNativeTikTokChat", "(Ljava/lang/String;Ljava/lang/String;)V", &[JValue::Object(&user), JValue::Object(&message)]);
+            let class = JClass::from(class.as_obj());
+            let _ = env.call_static_method(class, "onNativeTikTokChat", "(Ljava/lang/String;Ljava/lang/String;)V", &[JValue::Object(&user), JValue::Object(&message)]);
         }
     }
 }
@@ -40,7 +43,8 @@ fn chat(vm: &JavaVM, class: &GlobalRef, username: &str, comment: &str) {
 fn gift(vm: &JavaVM, class: &GlobalRef, name: &str, coins: i64, combo: bool, streak_over: bool) {
     if let Ok(mut env) = vm.attach_current_thread() {
         if let Ok(value) = env.new_string(name) {
-            let _ = env.call_static_method(class.as_obj(), "onNativeTikTokGift", "(Ljava/lang/String;JZZ)V", &[
+            let class = JClass::from(class.as_obj());
+            let _ = env.call_static_method(class, "onNativeTikTokGift", "(Ljava/lang/String;JZZ)V", &[
                 JValue::Object(&value), JValue::Long(coins),
                 JValue::Bool(combo as jboolean), JValue::Bool(streak_over as jboolean),
             ]);
@@ -53,9 +57,6 @@ pub extern "system" fn Java_com_livecraft_TikTokNative_nativeStart(mut env: JNIE
     let generation = GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
     let username: String = match env.get_string(&username) { Ok(value) => value.into(), Err(_) => return };
     let vm = match env.get_java_vm() { Ok(value) => value, Err(_) => return };
-
-    // Resolve the app class on the Java-originating JNI thread. Worker threads
-    // reuse this GlobalRef instead of calling FindClass with the wrong class loader.
     let bridge_class = match env.find_class("com/livecraft/GameBridgeService").and_then(|local| env.new_global_ref(local)) {
         Ok(value) => Arc::new(value),
         Err(_) => return,
