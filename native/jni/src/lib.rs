@@ -1,7 +1,8 @@
-use jni::objects::{JClass, JString, JValue};
+use jni::objects::{GlobalRef, JClass, JString, JValue};
 use jni::sys::jboolean;
 use jni::{JNIEnv, JavaVM};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use std::thread;
 use tokio::time::{sleep, Duration};
 use livecraft_tiktok_core::{TikTokLive, structs::TikTokLiveEvent};
@@ -12,190 +13,155 @@ fn is_current(generation: u64) -> bool {
     GENERATION.load(Ordering::SeqCst) == generation
 }
 
-fn status(vm: &JavaVM, message: &str) {
+fn status(vm: &JavaVM, class: &GlobalRef, message: &str) {
     if let Ok(mut env) = vm.attach_current_thread() {
-        if let (Ok(class), Ok(value)) = (
-            env.find_class("com/livecraft/GameBridgeService"),
-            env.new_string(message),
-        ) {
-            let _ = env.call_static_method(
-                class,
-                "onNativeTikTokStatus",
-                "(Ljava/lang/String;)V",
-                &[JValue::Object(&value)],
-            );
+        if let Ok(value) = env.new_string(message) {
+            let class = <&JClass>::from(class.as_obj());
+            let _ = env.call_static_method(class, "onNativeTikTokStatus", "(Ljava/lang/String;)V", &[JValue::Object(&value)]);
         }
     }
 }
 
-fn diagnostic(vm: &JavaVM, event_type: &str) {
+fn diagnostic(vm: &JavaVM, class: &GlobalRef, event_type: &str) {
     if let Ok(mut env) = vm.attach_current_thread() {
-        if let (Ok(class), Ok(value)) = (
-            env.find_class("com/livecraft/GameBridgeService"),
-            env.new_string(event_type),
-        ) {
-            let _ = env.call_static_method(
-                class,
-                "onNativeTikTokDiagnostic",
-                "(Ljava/lang/String;)V",
-                &[JValue::Object(&value)],
-            );
+        if let Ok(value) = env.new_string(event_type) {
+            let class = <&JClass>::from(class.as_obj());
+            let _ = env.call_static_method(class, "onNativeTikTokDiagnostic", "(Ljava/lang/String;)V", &[JValue::Object(&value)]);
         }
     }
 }
 
-fn chat(vm: &JavaVM, username: &str, comment: &str) {
+fn chat(vm: &JavaVM, class: &GlobalRef, username: &str, comment: &str) {
     if let Ok(mut env) = vm.attach_current_thread() {
-        if let (Ok(user), Ok(message), Ok(class)) = (
-            env.new_string(username),
-            env.new_string(comment),
-            env.find_class("com/livecraft/GameBridgeService"),
-        ) {
-            let _ = env.call_static_method(
-                class,
-                "onNativeTikTokChat",
-                "(Ljava/lang/String;Ljava/lang/String;)V",
-                &[JValue::Object(&user), JValue::Object(&message)],
-            );
+        if let (Ok(user), Ok(message)) = (env.new_string(username), env.new_string(comment)) {
+            let class = <&JClass>::from(class.as_obj());
+            let _ = env.call_static_method(class, "onNativeTikTokChat", "(Ljava/lang/String;Ljava/lang/String;)V", &[JValue::Object(&user), JValue::Object(&message)]);
         }
     }
 }
 
-fn gift(vm: &JavaVM, name: &str, coins: i64, combo: bool, streak_over: bool) {
+fn gift(vm: &JavaVM, class: &GlobalRef, name: &str, coins: i64, combo: bool, streak_over: bool) {
     if let Ok(mut env) = vm.attach_current_thread() {
-        if let (Ok(class), Ok(value)) = (
-            env.find_class("com/livecraft/GameBridgeService"),
-            env.new_string(name),
-        ) {
-            let _ = env.call_static_method(
-                class,
-                "onNativeTikTokGift",
-                "(Ljava/lang/String;JZZ)V",
-                &[
-                    JValue::Object(&value),
-                    JValue::Long(coins),
-                    JValue::Bool(combo as jboolean),
-                    JValue::Bool(streak_over as jboolean),
-                ],
-            );
+        if let Ok(value) = env.new_string(name) {
+            let class = <&JClass>::from(class.as_obj());
+            let _ = env.call_static_method(class, "onNativeTikTokGift", "(Ljava/lang/String;JZZ)V", &[
+                JValue::Object(&value), JValue::Long(coins),
+                JValue::Bool(combo as jboolean), JValue::Bool(streak_over as jboolean),
+            ]);
         }
     }
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_livecraft_TikTokNative_nativeStart(
-    mut env: JNIEnv,
-    _class: JClass,
-    username: JString,
-) {
+pub extern "system" fn Java_com_livecraft_TikTokNative_nativeStart(mut env: JNIEnv, _class: JClass, username: JString) {
     let generation = GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
-    let username: String = match env.get_string(&username) {
-        Ok(value) => value.into(),
+    let username: String = match env.get_string(&username) { Ok(value) => value.into(), Err(_) => return };
+    let vm = match env.get_java_vm() { Ok(value) => value, Err(_) => return };
+    let bridge_class = match env.find_class("com/livecraft/GameBridgeService").and_then(|local| env.new_global_ref(local)) {
+        Ok(value) => Arc::new(value),
         Err(_) => return,
     };
-    let vm = match env.get_java_vm() {
-        Ok(value) => value,
-        Err(_) => return,
-    };
 
-    thread::spawn(move || {
-        let runtime = match tokio::runtime::Builder::new_multi_thread().enable_all().build() {
-            Ok(value) => value,
-            Err(error) => {
-                status(&vm, &format!("Falha ao iniciar o conector TikTok: {error}"));
-                return;
-            }
-        };
+    let vm = Arc::new(vm);
+    status(&vm, &bridge_class, "Checkpoint JNI 1: solicitação e VM obtidas.");
+    status(&vm, &bridge_class, "Checkpoint JNI 2: tentando criar thread Rust...");
+    let thread_vm = Arc::clone(&vm);
+    let thread_class = Arc::clone(&bridge_class);
 
-        runtime.block_on(async move {
-            let mut retry: u32 = 0;
+    let spawn_result = thread::Builder::new().name("livecraft-tiktok".into()).spawn(move || {
+        status(&vm, &thread_class, "Checkpoint thread 3: thread Rust entrou.");
+        status(&vm, &thread_class, "Checkpoint runtime 4: preparando runtime Tokio...");
+        let panic_vm = Arc::clone(&vm);
+        let panic_class = Arc::clone(&thread_class);
 
-            while is_current(generation) {
-                status(&vm, &format!("Localizando a LIVE de @{username}..."));
+        let worker_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let runtime = tokio::runtime::Builder::new_multi_thread().enable_all().build()
+                .map_err(|error| format!("Não foi possível preparar o runtime: {error}"))?;
+            status(&vm, &thread_class, "Runtime pronto. Iniciando busca da sala no TikTok...");
 
-                match TikTokLive::builder(&username).connect().await {
-                    Ok(mut stream) => {
-                        status(&vm, "Sala localizada. Aguardando conexão segura com a LIVE...");
-                        let mut reconnect = false;
-
-                        while is_current(generation) {
-                            tokio::select! {
-                                _ = sleep(Duration::from_millis(250)) => {},
-                                event = stream.next_event() => {
-                                    match event {
-                                        Ok(TikTokLiveEvent::Connected { .. }) => {
-                                            retry = 0;
-                                            status(&vm, &format!("Conectado à live de @{username}. Aguardando eventos."));
-                                        }
-                                        Ok(TikTokLiveEvent::Chat(event)) => {
-                                            let author = event.user.as_ref()
-                                                .map(|user| if !user.nickname.is_empty() {
-                                                    user.nickname.as_str()
-                                                } else {
-                                                    user.unique_id.as_str()
-                                                })
-                                                .unwrap_or("TikTok");
-                                            chat(&vm, author, &event.comment);
-                                        }
-                                        Ok(TikTokLiveEvent::Gift(event)) => {
-                                            let name = event.gift_details.as_ref()
-                                                .map(|details| details.gift_name.as_str())
-                                                .unwrap_or("Presente");
-                                            gift(&vm, name, event.diamond_total(), event.is_combo_gift(), event.is_streak_over());
-                                        }
-                                        Ok(TikTokLiveEvent::Reconnecting { attempt, max_retries, delay_secs }) => {
-                                            status(&vm, &format!("LIVE instável. Reconectando ({attempt}/{max_retries}) em {delay_secs}s..."));
-                                        }
-                                        Ok(TikTokLiveEvent::Disconnected) => {
-                                            status(&vm, "Conexão com a LIVE encerrada. Tentando novamente...");
-                                            reconnect = true;
-                                            break;
-                                        }
-                                        Ok(TikTokLiveEvent::Unknown { method, .. }) => {
-                                            diagnostic(&vm, &method);
-                                        }
-                                        Ok(_) => {},
-                                        Err(error) => {
-                                            status(&vm, &format!("Fluxo TikTok encerrado: {error}. Tentando novamente..."));
-                                            reconnect = true;
-                                            break;
+            runtime.block_on(async move {
+                let mut retry: u32 = 0;
+                while is_current(generation) {
+                    status(&vm, &thread_class, &format!("Consultando o TikTok para localizar a LIVE de @{username}..."));
+                    match TikTokLive::builder(&username).connect().await {
+                        Ok(mut stream) => {
+                            status(&vm, &thread_class, "Sala encontrada. Aguardando o WebSocket do TikTok...");
+                            let mut reconnect = false;
+                            while is_current(generation) {
+                                tokio::select! {
+                                    _ = sleep(Duration::from_millis(250)) => {},
+                                    event = stream.next_event() => {
+                                        match event {
+                                            Ok(TikTokLiveEvent::Connected { .. }) => {
+                                                retry = 0;
+                                                status(&vm, &thread_class, &format!("Conectado à live de @{username}. Aguardando eventos."));
+                                            }
+                                            Ok(TikTokLiveEvent::Chat(event)) => {
+                                                let author = event.user.as_ref().map(|user| if !user.nickname.is_empty() { user.nickname.as_str() } else { user.unique_id.as_str() }).unwrap_or("TikTok");
+                                                chat(&vm, &thread_class, author, &event.comment);
+                                            }
+                                            Ok(TikTokLiveEvent::Gift(event)) => {
+                                                let name = event.gift_details.as_ref().map(|details| details.gift_name.as_str()).unwrap_or("Presente");
+                                                gift(&vm, &thread_class, name, event.diamond_total(), event.is_combo_gift(), event.is_streak_over());
+                                            }
+                                            Ok(TikTokLiveEvent::Reconnecting { attempt, max_retries, delay_secs }) => {
+                                                status(&vm, &thread_class, &format!("LIVE instável. Reconectando ({attempt}/{max_retries}) em {delay_secs}s..."));
+                                            }
+                                            Ok(TikTokLiveEvent::Status(message)) => {
+                                                status(&vm, &thread_class, &message);
+                                            }
+                                            Ok(TikTokLiveEvent::Disconnected) => {
+                                                status(&vm, &thread_class, "TikTok encerrou o WebSocket. Preparando reconexão...");
+                                                reconnect = true;
+                                                break;
+                                            }
+                                            Ok(TikTokLiveEvent::Unknown { method, .. }) => diagnostic(&vm, &thread_class, &method),
+                                            Ok(_) => {},
+                                            Err(error) => {
+                                                status(&vm, &thread_class, &format!("Erro no fluxo de eventos do TikTok: {error}"));
+                                                reconnect = true;
+                                                break;
+                                            }
                                         }
                                     }
                                 }
                             }
+                            drop(stream);
+                            if !is_current(generation) { break; }
+                            if !reconnect { continue; }
                         }
-
-                        drop(stream);
-                        if !is_current(generation) {
-                            break;
-                        }
-                        if !reconnect {
-                            continue;
-                        }
+                        Err(error) => status(&vm, &thread_class, &format!("Falha ao localizar/conectar à LIVE: {error}")),
                     }
-                    Err(error) => {
-                        status(&vm, &format!("Não foi possível localizar/conectar à LIVE: {error}"));
-                    }
+                    if !is_current(generation) { break; }
+                    retry = retry.saturating_add(1);
+                    let delay = (2u64.saturating_pow(retry.min(4))).min(30);
+                    status(&vm, &thread_class, &format!("Nova tentativa em {delay}s (tentativa {retry})..."));
+                    sleep(Duration::from_secs(delay)).await;
                 }
+                status(&vm, &thread_class, "Conector TikTok parado.");
+            });
+            Ok::<(), String>(())
+        }));
 
-                if !is_current(generation) {
-                    break;
-                }
-                retry = retry.saturating_add(1);
-                let delay = (2u64.saturating_pow(retry.min(4))).min(30);
-                status(&vm, &format!("Nova tentativa de conexão em {delay}s (tentativa {retry})..."));
-                sleep(Duration::from_secs(delay)).await;
+        match worker_result {
+            Ok(Ok(())) => {},
+            Ok(Err(error)) => status(&panic_vm, &panic_class, &format!("Falha na inicialização nativa: {error}")),
+            Err(payload) => {
+                let reason = payload.downcast_ref::<String>().map(String::as_str)
+                    .or_else(|| payload.downcast_ref::<&str>().copied())
+                    .unwrap_or("falha interna inesperada no conector");
+                status(&panic_vm, &panic_class, &format!("Falha interna do conector TikTok: {reason}"));
             }
-
-            status(&vm, "Conector TikTok parado.");
-        });
+        }
     });
+
+    match spawn_result {
+        Ok(_) => status(&thread_vm, &bridge_class, "Checkpoint JNI 5: thread criada."),
+        Err(error) => status(&thread_vm, &bridge_class, &format!("Falha ao criar thread Rust: {error}")),
+    }
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_livecraft_TikTokNative_nativeStop(
-    _env: JNIEnv,
-    _class: JClass,
-) {
+pub extern "system" fn Java_com_livecraft_TikTokNative_nativeStop(_env: JNIEnv, _class: JClass) {
     GENERATION.fetch_add(1, Ordering::SeqCst);
 }

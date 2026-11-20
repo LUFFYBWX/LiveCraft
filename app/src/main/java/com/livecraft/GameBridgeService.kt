@@ -20,30 +20,95 @@ class GameBridgeService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> stopBridge()
+            ACTION_START_MINECRAFT -> startMinecraftOnly()
+            ACTION_START_TIKTOK -> startTikTokOnly()
+            ACTION_STOP_MINECRAFT -> stopMinecraftOnly()
+            ACTION_STOP_TIKTOK -> stopTikTokOnly()
             else -> startBridge()
         }
         return START_STICKY
     }
 
-    private fun startBridge() {
+    private fun ensureForeground() {
         createNotificationChannel()
         val notification = if (Build.VERSION.SDK_INT >= 26) {
             Notification.Builder(this, CHANNEL_ID)
                 .setContentTitle("LiveCraft ativo")
-                .setContentText("Aguardando conexão do Minecraft")
+                .setContentText("Conexões do LiveCraft em execução")
                 .setSmallIcon(android.R.drawable.stat_notify_sync)
                 .build()
         } else {
             @Suppress("DEPRECATION")
             Notification.Builder(this)
                 .setContentTitle("LiveCraft ativo")
-                .setContentText("Aguardando conexão do Minecraft")
+                .setContentText("Conexões do LiveCraft em execução")
                 .setSmallIcon(android.R.drawable.stat_notify_sync)
                 .build()
         }
         if (Build.VERSION.SDK_INT >= 29) startForeground(1, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
         else startForeground(1, notification)
+    }
 
+    private fun startMinecraftOnly() {
+        ensureForeground()
+        try {
+            if (server == null) server = MinecraftSocketServer().also { it.start() }
+            update("Servidor Minecraft iniciado. Use /connect 127.0.0.1:8765 no jogo.", "Conexão Minecraft iniciada.")
+        } catch (error: Exception) {
+            update("Falha ao iniciar Minecraft: ${error.message}", "Erro no servidor local.")
+        }
+    }
+
+    private fun startTikTokOnly() {
+        ensureForeground()
+        val username = getSharedPreferences("livecraft", MODE_PRIVATE)
+            .getString("tiktok_username", "")?.trim()?.removePrefix("@").orEmpty()
+        if (username.isBlank()) {
+            update("Informe e salve seu usuário do TikTok antes de conectar.", "Usuário do TikTok não configurado.")
+            return
+        }
+        if (activeTikTokUsername == username) {
+            update("Conector TikTok já está em execução para @$username.", "TikTok já iniciado.")
+            return
+        }
+        stopTikTokConnector()
+        try {
+            saveNativeCheckpoint("Kotlin: antes de chamar JNI para @$username")
+            TikTokNative.start(username)
+            saveNativeCheckpoint("Kotlin: JNI retornou sem fechar")
+            activeTikTokUsername = username
+            tiktokConnected = false
+            update("Procurando a LIVE de @$username...", "Conector TikTok iniciado.")
+        } catch (error: Throwable) {
+            activeTikTokUsername = null
+            tiktokConnected = false
+            update("Falha ao iniciar o conector TikTok: ${error.message ?: error.javaClass.simpleName}", "Verifique a instalação do aplicativo.")
+        }
+    }
+
+    private fun stopMinecraftOnly() {
+        try { server?.stop(500) } catch (_: Exception) {}
+        server = null
+        connected = null
+        update("Conexão Minecraft encerrada.", "Servidor Minecraft parado.")
+        stopIfIdle()
+    }
+
+    private fun stopTikTokOnly() {
+        stopTikTokConnector()
+        update("Conexão TikTok encerrada.", "Conector TikTok parado.")
+        stopIfIdle()
+    }
+
+    private fun stopIfIdle() {
+        if (server == null && activeTikTokUsername == null) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        }
+    }
+
+    private fun startBridge() {
+        ensureForeground()
         try {
             if (server == null) {
                 server = MinecraftSocketServer().also { it.start() }
@@ -84,6 +149,7 @@ class GameBridgeService : Service() {
         tiktokConnected = false
         try { server?.stop(500) } catch (_: Exception) {}
         server = null
+        connected = null
         update("Servidor parado", "Conexão encerrada.")
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -175,6 +241,10 @@ class GameBridgeService : Service() {
     companion object {
         const val ACTION_START = "com.livecraft.START"
         const val ACTION_STOP = "com.livecraft.STOP"
+        const val ACTION_START_MINECRAFT = "com.livecraft.START_MINECRAFT"
+        const val ACTION_START_TIKTOK = "com.livecraft.START_TIKTOK"
+        const val ACTION_STOP_MINECRAFT = "com.livecraft.STOP_MINECRAFT"
+        const val ACTION_STOP_TIKTOK = "com.livecraft.STOP_TIKTOK"
         const val ACTION_UPDATE = "com.livecraft.UPDATE"
         const val EXTRA_STATUS = "status"
         const val EXTRA_LOG = "log"
@@ -207,8 +277,16 @@ class GameBridgeService : Service() {
             instance?.handleTikTokChat(username, comment)
         }
 
+        private fun saveNativeCheckpoint(message: String) {
+            instance?.getSharedPreferences("livecraft", MODE_PRIVATE)?.edit()
+                ?.putString("native_checkpoint", message)
+                ?.putLong("native_checkpoint_time", System.currentTimeMillis())
+                ?.commit()
+        }
+
         @JvmStatic
         fun onNativeTikTokStatus(message: String) {
+            saveNativeCheckpoint("Rust: $message")
             val lower = message.lowercase()
             tiktokConnected = lower.startsWith("conectado à live") || lower.startsWith("conectado a live")
             instance?.update(message, message)

@@ -73,17 +73,44 @@ class MainActivity : Activity() {
         root.addView(space(8))
 
         root.addView(sectionTitle("CONTROLES"))
-        root.addView(makeButton("INICIAR LIVECRAFT") {
-            requestNotificationPermissionIfNeeded()
-            val username = tiktokUsername.text.toString().trim().removePrefix("@")
-            getSharedPreferences("livecraft", MODE_PRIVATE).edit().putString("tiktok_username", username).apply()
-            val i = Intent(this, GameBridgeService::class.java).setAction(GameBridgeService.ACTION_START)
-            if (Build.VERSION.SDK_INT >= 26) startForegroundService(i) else startService(i)
-            generalStatus.text = "Iniciando conexões..."
+        root.addView(makeButton("SALVAR USUÁRIO") {
+            val username = tiktokUsername.text.toString().trim().removePrefix("@").trim()
+            if (username.isBlank()) {
+                generalStatus.text = "Digite seu usuário do TikTok antes de salvar."
+            } else {
+                getSharedPreferences("livecraft", MODE_PRIVATE).edit().putString("tiktok_username", username).apply()
+                generalStatus.text = "Usuário configurado: @$username. Agora você pode conectar à LIVE."
+            }
         })
-        root.addView(makeButton("PARAR LIVECRAFT") {
+        root.addView(makeButton("CONECTAR À LIVE") {
+            requestNotificationPermissionIfNeeded()
+            val username = tiktokUsername.text.toString().trim().removePrefix("@").trim()
+            if (username.isBlank()) {
+                generalStatus.text = "Digite seu usuário do TikTok antes de conectar."
+            } else {
+                getSharedPreferences("livecraft", MODE_PRIVATE).edit().putString("tiktok_username", username).apply()
+                val i = Intent(this, GameBridgeService::class.java).setAction(GameBridgeService.ACTION_START_TIKTOK)
+                if (Build.VERSION.SDK_INT >= 26) startForegroundService(i) else startService(i)
+                generalStatus.text = "Procurando a LIVE de @$username..."
+            }
+        })
+        root.addView(makeButton("CONECTAR AO MINECRAFT") {
+            requestNotificationPermissionIfNeeded()
+            val i = Intent(this, GameBridgeService::class.java).setAction(GameBridgeService.ACTION_START_MINECRAFT)
+            if (Build.VERSION.SDK_INT >= 26) startForegroundService(i) else startService(i)
+            generalStatus.text = "Iniciando servidor local do Minecraft..."
+        })
+        root.addView(makeButton("DESCONECTAR DA LIVE") {
+            startService(Intent(this, GameBridgeService::class.java).setAction(GameBridgeService.ACTION_STOP_TIKTOK))
+            generalStatus.text = "Encerrando conexão com o TikTok..."
+        })
+        root.addView(makeButton("DESCONECTAR DO MINECRAFT") {
+            startService(Intent(this, GameBridgeService::class.java).setAction(GameBridgeService.ACTION_STOP_MINECRAFT))
+            generalStatus.text = "Encerrando conexão com o Minecraft..."
+        })
+        root.addView(makeButton("PARAR TUDO") {
             startService(Intent(this, GameBridgeService::class.java).setAction(GameBridgeService.ACTION_STOP))
-            generalStatus.text = "Desligando conexões..."
+            generalStatus.text = "Desligando todas as conexões..."
         })
         root.addView(space(8))
 
@@ -106,7 +133,12 @@ class MainActivity : Activity() {
         root.addView(space(12))
 
         root.addView(sectionTitle("MENSAGEM DO LIVECRAFT"))
-        generalStatus = label("Aguardando você iniciar.", 14f, Color.WHITE)
+        val lastCheckpoint = getSharedPreferences("livecraft", MODE_PRIVATE)
+            .getString("native_checkpoint", null)
+        generalStatus = label(
+            lastCheckpoint?.let { "Última etapa registrada: $it" } ?: "Aguardando você iniciar.",
+            14f, Color.WHITE
+        )
         root.addView(generalStatus)
         root.addView(space(12))
 
