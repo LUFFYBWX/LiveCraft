@@ -14,6 +14,7 @@ import java.util.UUID
 class GameBridgeService : Service() {
     private var server: MinecraftSocketServer? = null
     private var activeTikTokUsername: String? = null
+    private var pendingLikes: Long = 0
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -195,6 +196,16 @@ class GameBridgeService : Service() {
         return sent
     }
 
+    @Synchronized fun handleTikTokLikes(count: Int) {
+        if (count <= 0) return
+        pendingLikes += count.toLong()
+        while (pendingLikes >= 100) {
+            pendingLikes -= 100
+            val sent = sendCommand("summon zombie ~ ~1 ~")
+            update(if (sent) "Meta de 100 likes atingida: 1 Zumbi!" else "100 likes atingidos, mas Minecraft está desconectado", "100 likes → summon zombie")
+        }
+    }
+
     fun handleTikTokChat(username: String, comment: String): Boolean {
         val safeUser = username.replace('\r', ' ').replace('\n', ' ').take(32)
         val safeComment = comment.replace('\r', ' ').replace('\n', ' ').take(180)
@@ -270,6 +281,11 @@ class GameBridgeService : Service() {
         @JvmStatic
         fun onNativeTikTokGift(giftName: String, diamondTotal: Long, isCombo: Boolean, isStreakOver: Boolean) {
             instance?.handleTikTokGift(giftName, diamondTotal, isCombo, isStreakOver)
+        }
+
+        @JvmStatic
+        fun onNativeTikTokLikes(count: Int) {
+            instance?.handleTikTokLikes(count)
         }
 
         @JvmStatic
