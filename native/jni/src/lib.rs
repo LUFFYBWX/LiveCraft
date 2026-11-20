@@ -40,6 +40,13 @@ fn chat(vm: &JavaVM, class: &GlobalRef, username: &str, comment: &str) {
     }
 }
 
+fn likes(vm: &JavaVM, class: &GlobalRef, count: i32) {
+    if let Ok(mut env) = vm.attach_current_thread() {
+        let class = <&JClass>::from(class.as_obj());
+        let _ = env.call_static_method(class, "onNativeTikTokLikes", "(I)V", &[JValue::Int(count)]);
+    }
+}
+
 fn gift(vm: &JavaVM, class: &GlobalRef, name: &str, coins: i64, combo: bool, streak_over: bool) {
     if let Ok(mut env) = vm.attach_current_thread() {
         if let Ok(value) = env.new_string(name) {
@@ -103,6 +110,9 @@ pub extern "system" fn Java_com_livecraft_TikTokNative_nativeStart(mut env: JNIE
                                             Ok(TikTokLiveEvent::Gift(event)) => {
                                                 let name = event.gift_details.as_ref().map(|details| details.gift_name.as_str()).unwrap_or("Presente");
                                                 gift(&vm, &thread_class, name, event.diamond_total(), event.is_combo_gift(), event.is_streak_over());
+                                            }
+                                            Ok(TikTokLiveEvent::Like(event)) => {
+                                                likes(&vm, &thread_class, event.like_count);
                                             }
                                             Ok(TikTokLiveEvent::Reconnecting { attempt, max_retries, delay_secs }) => {
                                                 status(&vm, &thread_class, &format!("LIVE instável. Reconectando ({attempt}/{max_retries}) em {delay_secs}s..."));
