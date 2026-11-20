@@ -213,6 +213,10 @@ pub extern "system" fn Java_com_livecraft_TikTokNative_nativeStart(
             }
         }
     });
+    match spawn_result {
+        Ok(_) => status(&thread_vm, "Checkpoint JNI 5: thread criada."),
+        Err(error) => status(&thread_vm, &format!("Falha ao criar thread Rust: {error}")),
+    }
 }
 
 #[no_mangle]
