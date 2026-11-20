@@ -2,9 +2,7 @@ package com.livecraft
 
 /**
  * Converts finalized TikTok gift events into Minecraft commands.
- *
- * The TikTok connector must call [handle] only for a finalized gift event.
- * Combo gifts are ignored until the connector marks the streak as finished.
+ * Combo gifts are processed only after the streak ends.
  */
 data class LiveGiftEvent(
     val giftName: String,
@@ -21,29 +19,30 @@ data class GiftAction(
 )
 
 class GiftRuleEngine(
-    private val roseNames: Set<String> = setOf("rose"),
-    private val dinosaurNames: Set<String> = setOf("dinosaur")
+    private val roseNames: Set<String> = setOf("rose", "rosa"),
+    private val whiteRoseNames: Set<String> = setOf("white rose", "rosa branca"),
+    private val miniDinoNames: Set<String> = setOf("mini dino"),
+    private val capybaraNames: Set<String> = setOf("capybara", "capivara"),
+    private val disabledWorldDeleteNames: Set<String> = setOf("hat and mustache", "chapéu e bigode", "chapeu e bigode")
 ) {
     /**
-     * Returns null for unfinished combo events or gifts without a configured action.
-     * The threshold is strictly greater than 100 diamonds, as requested.
+     * Returns null for unfinished combos, unsupported destructive actions,
+     * and gifts without a configured action.
      */
     fun handle(event: LiveGiftEvent): GiftAction? {
         if (event.isCombo && !event.isStreakOver) return null
 
         val normalizedName = event.giftName.trim().lowercase()
-        // Named special gifts take priority over the generic value rule.
         val command = when {
             normalizedName in roseNames -> "summon zombie ~ ~1 ~"
-            normalizedName in dinosaurNames -> "summon wither ~ ~1 ~"
-            event.diamondTotal > 100L -> "kill @p"
+            normalizedName in whiteRoseNames -> "give @p golden_apple 1"
+            normalizedName in miniDinoNames -> "clear @p"
+            normalizedName in capybaraNames -> "kill @p"
+            // Deleting a world is not a Minecraft command and is intentionally disabled.
+            normalizedName in disabledWorldDeleteNames -> return null
             else -> return null
         }
 
-        return GiftAction(
-            giftName = event.giftName,
-            diamondTotal = event.diamondTotal,
-            command = command
-        )
+        return GiftAction(event.giftName, event.diamondTotal, command)
     }
 }
