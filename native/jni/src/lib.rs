@@ -107,6 +107,9 @@ pub extern "system" fn Java_com_livecraft_TikTokNative_nativeStart(mut env: JNIE
                                             Ok(TikTokLiveEvent::Reconnecting { attempt, max_retries, delay_secs }) => {
                                                 status(&vm, &thread_class, &format!("LIVE instável. Reconectando ({attempt}/{max_retries}) em {delay_secs}s..."));
                                             }
+                                            Ok(TikTokLiveEvent::Status(message)) => {
+                                                status(&vm, &thread_class, &message);
+                                            }
                                             Ok(TikTokLiveEvent::Disconnected) => {
                                                 status(&vm, &thread_class, "TikTok encerrou o WebSocket. Preparando reconexão...");
                                                 reconnect = true;
