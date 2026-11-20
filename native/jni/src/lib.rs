@@ -16,7 +16,7 @@ fn is_current(generation: u64) -> bool {
 fn status(vm: &JavaVM, class: &GlobalRef, message: &str) {
     if let Ok(mut env) = vm.attach_current_thread() {
         if let Ok(value) = env.new_string(message) {
-            let class = JClass::from(class.as_obj());
+            let class = <&JClass>::from(class.as_obj());
             let _ = env.call_static_method(class, "onNativeTikTokStatus", "(Ljava/lang/String;)V", &[JValue::Object(&value)]);
         }
     }
@@ -25,7 +25,7 @@ fn status(vm: &JavaVM, class: &GlobalRef, message: &str) {
 fn diagnostic(vm: &JavaVM, class: &GlobalRef, event_type: &str) {
     if let Ok(mut env) = vm.attach_current_thread() {
         if let Ok(value) = env.new_string(event_type) {
-            let class = JClass::from(class.as_obj());
+            let class = <&JClass>::from(class.as_obj());
             let _ = env.call_static_method(class, "onNativeTikTokDiagnostic", "(Ljava/lang/String;)V", &[JValue::Object(&value)]);
         }
     }
@@ -34,7 +34,7 @@ fn diagnostic(vm: &JavaVM, class: &GlobalRef, event_type: &str) {
 fn chat(vm: &JavaVM, class: &GlobalRef, username: &str, comment: &str) {
     if let Ok(mut env) = vm.attach_current_thread() {
         if let (Ok(user), Ok(message)) = (env.new_string(username), env.new_string(comment)) {
-            let class = JClass::from(class.as_obj());
+            let class = <&JClass>::from(class.as_obj());
             let _ = env.call_static_method(class, "onNativeTikTokChat", "(Ljava/lang/String;Ljava/lang/String;)V", &[JValue::Object(&user), JValue::Object(&message)]);
         }
     }
@@ -43,7 +43,7 @@ fn chat(vm: &JavaVM, class: &GlobalRef, username: &str, comment: &str) {
 fn gift(vm: &JavaVM, class: &GlobalRef, name: &str, coins: i64, combo: bool, streak_over: bool) {
     if let Ok(mut env) = vm.attach_current_thread() {
         if let Ok(value) = env.new_string(name) {
-            let class = JClass::from(class.as_obj());
+            let class = <&JClass>::from(class.as_obj());
             let _ = env.call_static_method(class, "onNativeTikTokGift", "(Ljava/lang/String;JZZ)V", &[
                 JValue::Object(&value), JValue::Long(coins),
                 JValue::Bool(combo as jboolean), JValue::Bool(streak_over as jboolean),
