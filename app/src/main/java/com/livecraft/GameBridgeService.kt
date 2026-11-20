@@ -73,7 +73,9 @@ class GameBridgeService : Service() {
         }
         stopTikTokConnector()
         try {
+            saveNativeCheckpoint("Kotlin: antes de chamar JNI para @$username")
             TikTokNative.start(username)
+            saveNativeCheckpoint("Kotlin: JNI retornou sem fechar")
             activeTikTokUsername = username
             tiktokConnected = false
             update("Procurando a LIVE de @$username...", "Conector TikTok iniciado.")
