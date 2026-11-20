@@ -133,7 +133,12 @@ class MainActivity : Activity() {
         root.addView(space(12))
 
         root.addView(sectionTitle("MENSAGEM DO LIVECRAFT"))
-        generalStatus = label("Aguardando você iniciar.", 14f, Color.WHITE)
+        val lastCheckpoint = getSharedPreferences("livecraft", MODE_PRIVATE)
+            .getString("native_checkpoint", null)
+        generalStatus = label(
+            lastCheckpoint?.let { "Última etapa registrada: $it" } ?: "Aguardando você iniciar.",
+            14f, Color.WHITE
+        )
         root.addView(generalStatus)
         root.addView(space(12))
 
