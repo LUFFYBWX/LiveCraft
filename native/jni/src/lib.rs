@@ -100,9 +100,12 @@ pub extern "system" fn Java_com_livecraft_TikTokNative_nativeStart(
     };
 
     let vm = Arc::new(vm);
-    status(&vm, "Solicitação recebida. Preparando conector nativo...");
-    thread::spawn(move || {
-        status(&vm, "Thread do TikTok iniciada. Preparando runtime...");
+    status(&vm, "Checkpoint JNI 1: solicitação e VM obtidas.");
+    status(&vm, "Checkpoint JNI 2: tentando criar thread Rust...");
+    let thread_vm = Arc::clone(&vm);
+    let spawn_result = thread::Builder::new().name("livecraft-tiktok".into()).spawn(move || {
+        status(&vm, "Checkpoint thread 3: thread Rust entrou.");
+        status(&vm, "Checkpoint runtime 4: preparando runtime Tokio...");
         // Runtime creation is included in the panic boundary as well. Previously it
         // happened before catch_unwind, leaving part of native startup unprotected.
         let panic_vm = Arc::clone(&vm);
