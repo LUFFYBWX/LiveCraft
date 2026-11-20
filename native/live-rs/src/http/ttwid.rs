@@ -27,6 +27,10 @@ pub async fn fetch_ttwid(request: &TtwidRequest<'_>) -> Result<String, TikTokLiv
         attempt += 1;
         let resp = client.get(request.url).send().await?;
         let status = resp.status();
+        let final_url = resp.url().host_str().unwrap_or("unknown").to_string();
+        let content_type = resp.headers().get(reqwest::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok()).unwrap_or("missing").to_string();
+        let set_cookie_names = cookie_names(resp.headers());
         if let Some(ttwid) = find_ttwid(resp.headers())? {
             return Ok(ttwid);
         }
@@ -42,7 +46,12 @@ pub async fn fetch_ttwid(request: &TtwidRequest<'_>) -> Result<String, TikTokLiv
         }
 
         if attempt >= request.attempts {
-            return Err(TikTokLiveError::ttwid(format!("no ttwid cookie after {attempt} attempts (last http {status})")));
+            let jar_cookie_names = cookie_jar.cookies(&cookie_url)
+                .and_then(|v| v.to_str().ok().map(cookie_names_from_header))
+                .unwrap_or_else(|| "none".to_string());
+            return Err(TikTokLiveError::ttwid(format!(
+                "no ttwid after {attempt} attempts; http={status}; final_host={final_url}; content_type={content_type}; set_cookie_names={set_cookie_names}; jar_cookie_names={jar_cookie_names}"
+            )));
         }
         tracing::warn!(attempt, %status, "no ttwid cookie in response or cookie jar, retrying");
         tokio::time::sleep(request.retry_delay).await;
@@ -70,6 +79,22 @@ fn find_ttwid(headers: &HeaderMap) -> Result<Option<String>, TikTokLiveError> {
         }
     }
     Ok(None)
+}
+
+fn cookie_names(headers: &HeaderMap) -> String {
+    let names: Vec<String> = headers.get_all("set-cookie").iter()
+        .filter_map(|v| v.to_str().ok())
+        .filter_map(|v| v.split(';').next())
+        .filter_map(|v| v.split_once('=').map(|(name, _)| name.trim().to_string()))
+        .collect();
+    if names.is_empty() { "none".to_string() } else { names.join(",") }
+}
+
+fn cookie_names_from_header(value: &str) -> String {
+    let names: Vec<String> = value.split(';')
+        .filter_map(|part| part.trim().split_once('=').map(|(name, _)| name.trim().to_string()))
+        .collect();
+    if names.is_empty() { "none".to_string() } else { names.join(",") }
 }
 
 fn find_ttwid_cookie_header(value: &str) -> Option<String> {
