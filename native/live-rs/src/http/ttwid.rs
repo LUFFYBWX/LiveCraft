@@ -1,8 +1,8 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use reqwest::cookie::Jar;
-use reqwest::header::{HeaderMap, COOKIE};
+use reqwest::cookie::{CookieStore, Jar};
+use reqwest::header::HeaderMap;
 use reqwest::Url;
 
 use crate::errors::TikTokLiveError;
