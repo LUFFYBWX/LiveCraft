@@ -8,44 +8,32 @@ class GiftRuleEngineTest {
     private val engine = GiftRuleEngine()
 
     @Test fun roseSummonsOneZombie() {
-        assertEquals(
-            "summon zombie ~ ~1 ~",
-            engine.handle(LiveGiftEvent("Rose", 1))?.command
-        )
+        assertEquals("summon zombie ~ ~1 ~", engine.handle(LiveGiftEvent("Rose", 1))?.command)
+        assertEquals("summon zombie ~ ~1 ~", engine.handle(LiveGiftEvent("Rosa", 1))?.command)
     }
 
-    @Test fun dinosaurSummonsWither() {
-        assertEquals(
-            "summon wither ~ ~1 ~",
-            engine.handle(LiveGiftEvent("Dinosaur", 299))?.command
-        )
+    @Test fun whiteRoseGivesGoldenApple() {
+        assertEquals("give @p golden_apple 1", engine.handle(LiveGiftEvent("Rosa Branca", 1))?.command)
     }
 
-    @Test fun giftsAboveOneHundredDiamondsKillNearestPlayer() {
-        assertEquals(
-            "kill @p",
-            engine.handle(LiveGiftEvent("Any gift", 101))?.command
-        )
+    @Test fun miniDinoClearsInventory() {
+        assertEquals("clear @p", engine.handle(LiveGiftEvent("Mini Dino", 1))?.command)
     }
 
-    @Test fun exactlyOneHundredDiamondsDoesNotTriggerKill() {
-        assertNull(engine.handle(LiveGiftEvent("Any gift", 100)))
+    @Test fun capybaraKillsNearestPlayer() {
+        assertEquals("kill @p", engine.handle(LiveGiftEvent("Capivara", 1))?.command)
+    }
+
+    @Test fun worldDeleteGiftIsSafelyDisabled() {
+        assertNull(engine.handle(LiveGiftEvent("Chapéu e Bigode", 1)))
+    }
+
+    @Test fun oldTestGiftsAndGenericCoinRuleAreRemoved() {
+        assertNull(engine.handle(LiveGiftEvent("Dinosaur", 299)))
+        assertNull(engine.handle(LiveGiftEvent("Any gift", 101)))
     }
 
     @Test fun unfinishedComboIsIgnored() {
-        assertNull(
-            engine.handle(
-                LiveGiftEvent("Rose", 1, repeatCount = 4, isCombo = true, isStreakOver = false)
-            )
-        )
-    }
-
-    @Test fun finalizedComboTriggersOnlyOneAction() {
-        assertEquals(
-            "summon zombie ~ ~1 ~",
-            engine.handle(
-                LiveGiftEvent("Rose", 4, repeatCount = 4, isCombo = true, isStreakOver = true)
-            )?.command
-        )
+        assertNull(engine.handle(LiveGiftEvent("Rose", 1, repeatCount = 4, isCombo = true, isStreakOver = false)))
     }
 }
