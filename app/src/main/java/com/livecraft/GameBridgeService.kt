@@ -277,8 +277,16 @@ class GameBridgeService : Service() {
             instance?.handleTikTokChat(username, comment)
         }
 
+        private fun saveNativeCheckpoint(message: String) {
+            instance?.getSharedPreferences("livecraft", MODE_PRIVATE)?.edit()
+                ?.putString("native_checkpoint", message)
+                ?.putLong("native_checkpoint_time", System.currentTimeMillis())
+                ?.commit()
+        }
+
         @JvmStatic
         fun onNativeTikTokStatus(message: String) {
+            saveNativeCheckpoint("Rust: $message")
             val lower = message.lowercase()
             tiktokConnected = lower.startsWith("conectado à live") || lower.startsWith("conectado a live")
             instance?.update(message, message)
