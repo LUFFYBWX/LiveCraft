@@ -120,11 +120,11 @@ pub extern "system" fn Java_com_livecraft_TikTokNative_nativeStart(
                 let mut retry: u32 = 0;
 
                 while is_current(generation) {
-                    status(&vm, &format!("Consultando o TikTok para localizar a LIVE de @{username}..."));
+                    status(&vm, &thread_class, &format!("Consultando o TikTok para localizar a LIVE de @{username}..."));
 
                     match TikTokLive::builder(&username).connect().await {
                         Ok(mut stream) => {
-                            status(&vm, "Sala encontrada. Aguardando o WebSocket do TikTok...");
+                            status(&vm, &thread_class, "Sala encontrada. Aguardando o WebSocket do TikTok...");
                             let mut reconnect = false;
 
                             while is_current(generation) {
@@ -156,7 +156,7 @@ pub extern "system" fn Java_com_livecraft_TikTokNative_nativeStart(
                                                 status(&vm, &format!("LIVE instável. Reconectando ({attempt}/{max_retries}) em {delay_secs}s..."));
                                             }
                                             Ok(TikTokLiveEvent::Disconnected) => {
-                                                status(&vm, "TikTok encerrou o WebSocket. Preparando reconexão...");
+                                                status(&vm, &thread_class, "TikTok encerrou o WebSocket. Preparando reconexão...");
                                                 reconnect = true;
                                                 break;
                                             }
@@ -196,14 +196,14 @@ pub extern "system" fn Java_com_livecraft_TikTokNative_nativeStart(
                     sleep(Duration::from_secs(delay)).await;
                 }
 
-                status(&vm, "Conector TikTok parado.");
+                status(&vm, &thread_class, "Conector TikTok parado.");
             });
             Ok::<(), String>(())
         }));
 
         match worker_result {
             Ok(Ok(())) => {}
-            Ok(Err(error)) => status(&panic_vm, &format!("Falha na inicialização nativa: {error}")),
+            Ok(Err(error)) => status(&panic_vm, &thread_class, &format!("Falha na inicialização nativa: {error}")),
             Err(payload) => {
                 let reason = payload.downcast_ref::<String>()
                     .map(String::as_str)
