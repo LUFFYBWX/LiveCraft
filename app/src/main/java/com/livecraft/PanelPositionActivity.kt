@@ -77,13 +77,16 @@ class PanelPositionActivity : Activity() {
                 .putFloat(FloatingOverlayService.KEY_PANEL_X, (preview.x / maxX).coerceIn(0f, 1f))
                 .putFloat(FloatingOverlayService.KEY_PANEL_Y, (preview.y / maxY).coerceIn(0f, 1f))
                 .putBoolean(FloatingOverlayService.KEY_PANEL, true).apply()
-            startOverlay(FloatingOverlayService.ACTION_PANEL_ON)
-            Toast.makeText(this, "Painel ativado. Ele não bloqueia toques.", Toast.LENGTH_SHORT).show()
-            finish()
+            if (startOverlay(FloatingOverlayService.ACTION_PANEL_ON)) {
+                Toast.makeText(this, "Painel ativado. Ele não bloqueia toques.", Toast.LENGTH_SHORT).show()
+                finish()
+            }
         }, 1f)
         buttons.addView(makeButton("DESATIVAR PAINEL") {
             getSharedPreferences("livecraft", MODE_PRIVATE).edit().putBoolean(FloatingOverlayService.KEY_PANEL, false).apply()
-            startOverlay(FloatingOverlayService.ACTION_PANEL_OFF)
+            if (android.os.Build.VERSION.SDK_INT < 23 || android.provider.Settings.canDrawOverlays(this)) {
+                startOverlay(FloatingOverlayService.ACTION_PANEL_OFF)
+            }
             finish()
         }, 1f)
         buttons.addView(makeButton("VOLTAR") { finish() }, 1f)
@@ -96,7 +99,7 @@ class PanelPositionActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(10), dp(8), dp(10), dp(8))
             background = GradientDrawable().apply {
-                setColor(0xE6000000.toInt()); cornerRadius = dp(16).toFloat(); setStroke(dp(1), Color.WHITE)
+                setColor(0xBF000000.toInt()); cornerRadius = dp(16).toFloat(); setStroke(dp(1), Color.WHITE)
             }
         }
         box.addView(TextView(this).apply {
@@ -128,18 +131,20 @@ class PanelPositionActivity : Activity() {
             prefs.edit().putBoolean("pending_panel_overlay_permission", false).apply()
             val intent = Intent(this, FloatingOverlayService::class.java).setAction(FloatingOverlayService.ACTION_PANEL_ON)
             if (android.os.Build.VERSION.SDK_INT >= 26) startForegroundService(intent) else startService(intent)
+            finish()
         }
     }
 
-    private fun startOverlay(action: String) {
+    private fun startOverlay(action: String): Boolean {
         if (android.os.Build.VERSION.SDK_INT >= 23 && !android.provider.Settings.canDrawOverlays(this)) {
             getSharedPreferences("livecraft", MODE_PRIVATE).edit().putBoolean("pending_panel_overlay_permission", true).apply()
             Toast.makeText(this, "Ative a permissão de sobreposição na próxima tela.", Toast.LENGTH_LONG).show()
             startActivity(Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION, android.net.Uri.parse("package:$packageName")))
-            return
+            return false
         }
         val intent = Intent(this, FloatingOverlayService::class.java).setAction(action)
         if (android.os.Build.VERSION.SDK_INT >= 26) startForegroundService(intent) else startService(intent)
+        return true
     }
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
