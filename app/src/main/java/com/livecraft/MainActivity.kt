@@ -75,6 +75,9 @@ class MainActivity : Activity() {
         root.addView(space(12))
 
         root.addView(sectionTitle("CONTROLES"))
+        root.addView(makeButton("PERSONALIZAR PRESENTES") {
+            startActivity(Intent(this, GiftRulesActivity::class.java))
+        })
         root.addView(makeButton("SALVAR USUÁRIO") {
             val username = tiktokUsername.text.toString().trim().removePrefix("@").trim()
             if (username.isBlank()) {
