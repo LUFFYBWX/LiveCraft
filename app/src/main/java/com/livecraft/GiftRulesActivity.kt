@@ -73,9 +73,13 @@ class GiftRulesActivity : Activity() {
                     Toast.makeText(this, "Informe um ID válido para essa ação.", Toast.LENGTH_SHORT).show(); return@setPositiveButton
                 }
                 val rule = GiftRule(gift, type, parameter, amount.text.toString().toIntOrNull()?.coerceIn(1, 64) ?: 1)
+                var targetIndex = old?.let { rules.indexOfFirst { existing -> existing.giftName.equals(it.giftName, true) } } ?: -1
                 val duplicate = rules.indexOfFirst { it.giftName.equals(gift, true) }
-                if (duplicate >= 0 && duplicate != index) rules.removeAt(duplicate)
-                if (index == null) rules.add(rule) else rules[index.coerceAtMost(rules.lastIndex)] = rule
+                if (duplicate >= 0 && duplicate != targetIndex) {
+                    rules.removeAt(duplicate)
+                    if (targetIndex > duplicate) targetIndex--
+                }
+                if (targetIndex < 0) rules.add(rule) else rules[targetIndex] = rule
                 save()
             }.show()
     }
