@@ -189,7 +189,15 @@ class GiftRulesActivity : Activity() {
             .setNegativeButton("Cancelar", null).setPositiveButton("REMOVER") { _, _ -> rules.removeAt(index); save() }.show()
     }
 
-    private fun save() { GiftRuleStore.save(this, rules); render() }
+    private fun save() {
+        GiftRuleStore.save(this, rules)
+        render()
+        if (getSharedPreferences("livecraft", MODE_PRIVATE).getBoolean(FloatingOverlayService.KEY_PANEL, false)) {
+            val intent = android.content.Intent(this, FloatingOverlayService::class.java)
+                .setAction(FloatingOverlayService.ACTION_REFRESH)
+            if (android.os.Build.VERSION.SDK_INT >= 26) startForegroundService(intent) else startService(intent)
+        }
+    }
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     private fun rounded(radius: Int, fill: Int, stroke: Int) = GradientDrawable().apply {
         setColor(fill); cornerRadius = radius * resources.displayMetrics.density
