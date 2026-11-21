@@ -162,7 +162,10 @@ object GiftRuleStore {
         val previous = entries[cleanName.lowercase()]
         entries[cleanName.lowercase()] = GiftCatalogEntry(cleanName, previous?.coins ?: 0, cleanUrl.ifBlank { previous?.imageUrl.orEmpty() }, previous?.emoji ?: "🎁")
         val array = JSONArray()
-        entries.values.filter { entry -> builtInGiftCatalog.none { it.name.equals(entry.name, true) } }.forEach {
+        entries.values.filter { entry ->
+            val builtIn = builtInGiftCatalog.firstOrNull { it.name.equals(entry.name, true) }
+            builtIn == null || entry.imageUrl != builtIn.imageUrl || entry.coins != builtIn.coins
+        }.forEach {
             array.put(JSONObject().put("name", it.name).put("coins", it.coins).put("imageUrl", it.imageUrl))
         }
         prefs.edit().putString(KEY_SEEN_GIFTS, array.toString()).apply()
