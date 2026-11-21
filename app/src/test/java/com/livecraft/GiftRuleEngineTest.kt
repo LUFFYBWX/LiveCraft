@@ -33,6 +33,21 @@ class GiftRuleEngineTest {
         assertNull(engine.handle(LiveGiftEvent("Any gift", 101)))
     }
 
+    @Test fun customGiftCanRunConfiguredAction() {
+        val custom = GiftRuleEngine(listOf(GiftRule("Galaxy", "GIVE", "diamond", 12)))
+        assertEquals("give @p diamond 12", custom.handle(LiveGiftEvent("Galaxy", 5))?.command)
+    }
+
+    @Test fun customEffectUsesSelectedLevel() {
+        val custom = GiftRuleEngine(listOf(GiftRule("Magic", "EFFECT", "speed", 3)))
+        assertEquals("effect @p speed 10 2 true", custom.handle(LiveGiftEvent("Magic", 5))?.command)
+    }
+
+    @Test fun invalidMinecraftIdentifierIsRejected() {
+        val custom = GiftRuleEngine(listOf(GiftRule("Bad", "GIVE", "diamond;kill @a", 1)))
+        assertNull(custom.handle(LiveGiftEvent("Bad", 5)))
+    }
+
     @Test fun unfinishedComboIsIgnored() {
         assertNull(engine.handle(LiveGiftEvent("Rose", 1, repeatCount = 4, isCombo = true, isStreakOver = false)))
     }
