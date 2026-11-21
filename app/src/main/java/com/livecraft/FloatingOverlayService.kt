@@ -20,6 +20,19 @@ class FloatingOverlayService : Service() {
     private lateinit var windowManager: WindowManager
     private var bubble: View? = null
     private var panel: View? = null
+    private var floatingMenu: View? = null
+    private var panelGiftIndex = 0
+    private val panelHandler = Handler(Looper.getMainLooper())
+    private val rotateGift = object : Runnable {
+        override fun run() {
+            val count = GiftRuleStore.load(this@FloatingOverlayService).size
+            if (prefs().getBoolean(KEY_PANEL, false) && count > 1) {
+                panelGiftIndex = (panelGiftIndex + 1) % count
+                refreshPanel()
+            }
+            if (prefs().getBoolean(KEY_PANEL, false)) panelHandler.postDelayed(this, 2000L)
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -47,7 +60,7 @@ class FloatingOverlayService : Service() {
         }
         when (intent?.action) {
             ACTION_BUBBLE_ON -> { prefs().edit().putBoolean(KEY_BUBBLE, true).apply(); showBubble() }
-            ACTION_BUBBLE_OFF -> { prefs().edit().putBoolean(KEY_BUBBLE, false).apply(); removeBubble() }
+            ACTION_BUBBLE_OFF -> { prefs().edit().putBoolean(KEY_BUBBLE, false).apply(); removeBubble(); removeMenu() }
             ACTION_PANEL_ON -> { prefs().edit().putBoolean(KEY_PANEL, true).apply(); showPanel() }
             ACTION_PANEL_OFF -> { prefs().edit().putBoolean(KEY_PANEL, false).apply(); removePanel() }
             ACTION_REFRESH -> { if (panel == null && prefs().getBoolean(KEY_PANEL, false)) showPanel() else refreshPanel() }
@@ -56,6 +69,7 @@ class FloatingOverlayService : Service() {
                 if (prefs().getBoolean(KEY_PANEL, false)) showPanel()
             }
         }
+        if (prefs().getBoolean(KEY_PANEL, false)) startGiftRotation()
         if (!prefs().getBoolean(KEY_BUBBLE, false) && !prefs().getBoolean(KEY_PANEL, false)) {
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
@@ -111,9 +125,7 @@ class FloatingOverlayService : Service() {
                 MotionEvent.ACTION_UP -> {
                     if (dragged) prefs().edit().putInt(KEY_BUBBLE_X, params.x).putInt(KEY_BUBBLE_Y, params.y).apply()
                     else {
-                        val open = Intent(this, MainActivity::class.java)
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                        startActivity(open)
+                        if (floatingMenu == null) showMenu() else removeMenu()
                     }
                     true
                 }
@@ -121,6 +133,61 @@ class FloatingOverlayService : Service() {
             }
         }
         try { windowManager.addView(view, params); bubble = view } catch (_: Exception) {}
+    }
+
+    private fun showMenu() {
+        if (floatingMenu != null) return
+        val menu = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+            background = GradientDrawable().apply {
+                setColor(0xF0000000.toInt()); cornerRadius = dp(16).toFloat()
+                setStroke(dp(1), Color.WHITE)
+            }
+        }
+        menu.addView(TextView(this).apply {
+            text = "LIVECRAFT"; textSize = 14f; typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.WHITE); gravity = Gravity.CENTER
+        })
+        val enabled = prefs().getBoolean(KEY_PANEL, false)
+        menu.addView(menuButton(if (enabled) "OCULTAR PRESENTE" else "MOSTRAR PRESENTES") {
+            if (prefs().getBoolean(KEY_PANEL, false)) {
+                prefs().edit().putBoolean(KEY_PANEL, false).apply()
+                removePanel()
+            } else {
+                prefs().edit().putBoolean(KEY_PANEL, true).apply()
+                panelGiftIndex = 0
+                showPanel()
+                startGiftRotation()
+            }
+            removeMenu()
+        })
+        menu.addView(menuButton("FECHAR MENU") { removeMenu() })
+        val params = WindowManager.LayoutParams(
+            dp(190), WindowManager.LayoutParams.WRAP_CONTENT, overlayType(),
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            val bx = prefs().getInt(KEY_BUBBLE_X, dp(14))
+            val by = prefs().getInt(KEY_BUBBLE_Y, dp(180))
+            x = (bx + dp(64)).coerceAtMost((resources.displayMetrics.widthPixels - dp(200)).coerceAtLeast(0))
+            y = by
+        }
+        try { windowManager.addView(menu, params); floatingMenu = menu } catch (_: Exception) {}
+    }
+
+    private fun menuButton(label: String, action: () -> Unit) = Button(this).apply {
+        text = label; isAllCaps = false; textSize = 12f; setTextColor(Color.WHITE)
+        background = GradientDrawable().apply {
+            setColor(Color.BLACK); cornerRadius = dp(12).toFloat(); setStroke(dp(1), Color.WHITE)
+        }
+        setOnClickListener { action() }
+    }
+
+    private fun removeMenu() {
+        floatingMenu?.let { try { windowManager.removeView(it) } catch (_: Exception) {} }
+        floatingMenu = null
     }
 
     private fun removeBubble() {
@@ -152,67 +219,55 @@ class FloatingOverlayService : Service() {
     }
 
     private fun buildGiftPanel(): View {
+        val rules = GiftRuleStore.load(this)
         val outer = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(12), dp(10), dp(12), dp(10))
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(10), dp(8), dp(12), dp(8))
             background = GradientDrawable().apply {
                 setColor(0xBF000000.toInt())
-                cornerRadius = dp(16).toFloat()
+                cornerRadius = dp(14).toFloat()
                 setStroke(dp(1), Color.WHITE)
             }
         }
-        outer.addView(TextView(this).apply {
-            text = "PRESENTES DA LIVE"
-            setTextColor(Color.WHITE); textSize = 13f; typeface = Typeface.DEFAULT_BOLD
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, 0, 0, dp(6))
-        })
-        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        val rules = GiftRuleStore.load(this)
         if (rules.isEmpty()) {
-            list.addView(panelText("Nenhum presente configurado", 12f, 0xFFBBBBBB.toInt()))
-        } else {
-            rules.forEach { rule ->
-                val row = LinearLayout(this).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    gravity = Gravity.CENTER_VERTICAL
-                    setPadding(0, dp(5), 0, dp(5))
-                }
-                val entry = GiftRuleStore.giftCatalog(this).firstOrNull { it.name.equals(rule.giftName, true) }
-                val imageUrl = rule.imageUrl.ifBlank { entry?.imageUrl.orEmpty() }
-                if (imageUrl.isNotBlank()) {
-                    val image = ImageView(this).apply {
-                        layoutParams = LinearLayout.LayoutParams(dp(34), dp(34))
-                        scaleType = ImageView.ScaleType.FIT_CENTER
-                        tag = imageUrl
-                    }
-                    loadImage(imageUrl, image)
-                    row.addView(image)
-                } else {
-                    row.addView(TextView(this).apply {
-                        text = entry?.emoji ?: rule.icon
-                        textSize = 25f
-                        gravity = Gravity.CENTER
-                        layoutParams = LinearLayout.LayoutParams(dp(34), dp(34))
-                    })
-                }
-                val texts = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(8), 0, 0, 0) }
-                texts.addView(panelText(rule.giftName, 13f, Color.WHITE, true))
-                val action = GiftRuleStore.actionLabel(rule.actionType) +
-                    (rule.value.takeIf { it.isNotBlank() }?.let { " • " + actionName(rule) } ?: "")
-                texts.addView(panelText(action, 11f, 0xFFCCCCCC.toInt()))
-                row.addView(texts, LinearLayout.LayoutParams(0, -2, 1f))
-                list.addView(row)
-                val divider = View(this).apply { setBackgroundColor(0x44FFFFFF) }
-                list.addView(divider, LinearLayout.LayoutParams(-1, dp(1)))
+            outer.addView(panelText("Nenhum presente configurado", 12f, 0xFFBBBBBB.toInt()))
+            return outer
+        }
+        panelGiftIndex = panelGiftIndex.coerceIn(0, rules.lastIndex)
+        val rule = rules[panelGiftIndex]
+        val entry = GiftRuleStore.giftCatalog(this).firstOrNull { it.name.equals(rule.giftName, true) }
+        val imageUrl = rule.imageUrl.ifBlank { entry?.imageUrl.orEmpty() }
+        if (imageUrl.isNotBlank()) {
+            val image = ImageView(this).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(42), dp(42))
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                tag = imageUrl
             }
+            loadImage(imageUrl, image)
+            outer.addView(image)
+        } else {
+            outer.addView(TextView(this).apply {
+                text = entry?.emoji ?: rule.icon
+                textSize = 29f; gravity = Gravity.CENTER
+                layoutParams = LinearLayout.LayoutParams(dp(42), dp(42))
+            })
         }
-        val scroll = ScrollView(this).apply {
-            isVerticalScrollBarEnabled = false
-            addView(list)
+        val texts = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(9), 0, 0, 0)
         }
-        outer.addView(scroll, LinearLayout.LayoutParams(-1, dp(250)))
+        texts.addView(panelText(rule.giftName, 13f, Color.WHITE, true))
+        val action = GiftRuleStore.actionLabel(rule.actionType) +
+            (rule.value.takeIf { it.isNotBlank() }?.let { " • " + actionName(rule) } ?: "")
+        texts.addView(panelText(action, 11f, 0xFFCCCCCC.toInt()))
+        outer.addView(texts, LinearLayout.LayoutParams(0, -2, 1f))
         return outer
+    }
+
+    private fun startGiftRotation() {
+        panelHandler.removeCallbacks(rotateGift)
+        if (prefs().getBoolean(KEY_PANEL, false)) panelHandler.postDelayed(rotateGift, 2000L)
     }
 
     private fun actionName(rule: GiftRule): String {
@@ -255,12 +310,13 @@ class FloatingOverlayService : Service() {
     }
 
     private fun removePanel() {
+        panelHandler.removeCallbacks(rotateGift)
         panel?.let { try { windowManager.removeView(it) } catch (_: Exception) {} }
         panel = null
     }
 
     override fun onDestroy() {
-        removeBubble(); removePanel()
+        removeBubble(); removeMenu(); removePanel()
         super.onDestroy()
     }
 
