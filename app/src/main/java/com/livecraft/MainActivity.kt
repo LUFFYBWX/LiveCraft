@@ -17,6 +17,7 @@ class MainActivity : Activity() {
     private lateinit var generalStatus: TextView
     private lateinit var log: TextView
     private lateinit var tiktokUsername: EditText
+    private lateinit var bubbleButton: Button
     private var receiverRegistered = false
 
     private val receiver = object : BroadcastReceiver() {
@@ -75,6 +76,11 @@ class MainActivity : Activity() {
         root.addView(space(12))
 
         root.addView(sectionTitle("CONTROLES"))
+        bubbleButton = makeButton(bubbleButtonLabel()) { toggleDuckBubble() }
+        root.addView(bubbleButton)
+        root.addView(makeButton("CONFIGURAR PAINEL DE PRESENTES") {
+            startActivity(Intent(this, PanelPositionActivity::class.java))
+        })
         root.addView(makeButton("PERSONALIZAR PRESENTES") {
             startActivity(Intent(this, GiftRulesActivity::class.java))
         })
@@ -150,6 +156,49 @@ class MainActivity : Activity() {
             setBackgroundColor(Color.BLACK)
             addView(root)
         })
+    }
+
+    private fun bubbleButtonLabel(): String =
+        if (getSharedPreferences("livecraft", MODE_PRIVATE).getBoolean(FloatingOverlayService.KEY_BUBBLE, false))
+            "DESATIVAR BOLINHA DO PATO" else "ATIVAR BOLINHA DO PATO"
+
+    private fun toggleDuckBubble() {
+        val prefs = getSharedPreferences("livecraft", MODE_PRIVATE)
+        val enabled = prefs.getBoolean(FloatingOverlayService.KEY_BUBBLE, false)
+        if (enabled) {
+            prefs.edit().putBoolean(FloatingOverlayService.KEY_BUBBLE, false).apply()
+            startOverlayService(FloatingOverlayService.ACTION_BUBBLE_OFF)
+        } else if (Build.VERSION.SDK_INT >= 23 && !android.provider.Settings.canDrawOverlays(this)) {
+            startActivityForResult(
+                Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    android.net.Uri.parse("package:$packageName")), 101
+            )
+            generalStatus.text = "Permita a sobreposição para ativar a bolinha do pato."
+        } else {
+            prefs.edit().putBoolean(FloatingOverlayService.KEY_BUBBLE, true).apply()
+            startOverlayService(FloatingOverlayService.ACTION_BUBBLE_ON)
+        }
+        bubbleButton.text = bubbleButtonLabel()
+    }
+
+    private fun startOverlayService(action: String) {
+        val intent = Intent(this, FloatingOverlayService::class.java).setAction(action)
+        if (Build.VERSION.SDK_INT >= 26) startForegroundService(intent) else startService(intent)
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 101 && Build.VERSION.SDK_INT >= 23 && android.provider.Settings.canDrawOverlays(this)) {
+            getSharedPreferences("livecraft", MODE_PRIVATE).edit()
+                .putBoolean(FloatingOverlayService.KEY_BUBBLE, true).apply()
+            startOverlayService(FloatingOverlayService.ACTION_BUBBLE_ON)
+        }
+        if (::bubbleButton.isInitialized) bubbleButton.text = bubbleButtonLabel()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::bubbleButton.isInitialized) bubbleButton.text = bubbleButtonLabel()
     }
 
     private fun roundedOutline(radiusDp: Int, fill: Int, stroke: Int): android.graphics.drawable.GradientDrawable =
