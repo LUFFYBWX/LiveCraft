@@ -70,7 +70,7 @@ class PanelPositionActivity : Activity() {
             }
         }
         val buttons = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        buttons.addView(makeButton("SALVAR E ATIVAR") {
+        buttons.addView(makeButton("SALVAR E ATIVAR", 1f) {
             val maxX = (stage.width - preview.width).coerceAtLeast(1)
             val maxY = (stage.height - preview.height).coerceAtLeast(1)
             getSharedPreferences("livecraft", MODE_PRIVATE).edit()
@@ -81,15 +81,15 @@ class PanelPositionActivity : Activity() {
                 Toast.makeText(this, "Painel ativado. Ele não bloqueia toques.", Toast.LENGTH_SHORT).show()
                 finish()
             }
-        }, 1f)
-        buttons.addView(makeButton("DESATIVAR PAINEL") {
+        })
+        buttons.addView(makeButton("DESATIVAR PAINEL", 1f) {
             getSharedPreferences("livecraft", MODE_PRIVATE).edit().putBoolean(FloatingOverlayService.KEY_PANEL, false).apply()
             if (android.os.Build.VERSION.SDK_INT < 23 || android.provider.Settings.canDrawOverlays(this)) {
                 startOverlay(FloatingOverlayService.ACTION_PANEL_OFF)
             }
             finish()
-        }, 1f)
-        buttons.addView(makeButton("VOLTAR") { finish() }, 1f)
+        })
+        buttons.addView(makeButton("VOLTAR", 1f) { finish() })
         root.addView(buttons)
         setContentView(root)
     }
