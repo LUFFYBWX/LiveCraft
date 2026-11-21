@@ -57,6 +57,7 @@ object GiftRuleStore {
     val commands = listOf(
         "☀️ Mudar para dia" to "time_day",
         "🌙 Meia-noite" to "time_midnight",
+        "🌃 Mudar para noite" to "time_night",
         "🌤️ Limpar clima" to "weather_clear",
         "🌧️ Chuva" to "weather_rain",
         "⛈️ Tempestade" to "weather_thunder",
@@ -231,6 +232,7 @@ object GiftRuleStore {
     fun commandForPreset(key: String): String? = when (key) {
         "time_day" -> "time set day"
         "time_midnight" -> "time set midnight"
+        "time_night" -> "time set night"
         "weather_clear" -> "weather clear"
         "weather_rain" -> "weather rain"
         "weather_thunder" -> "weather thunder"
