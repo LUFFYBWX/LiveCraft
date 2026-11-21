@@ -102,21 +102,23 @@ class PanelPositionActivity : Activity() {
                 setColor(0xBF000000.toInt()); cornerRadius = dp(16).toFloat(); setStroke(dp(1), Color.WHITE)
             }
         }
-        box.addView(TextView(this).apply {
-            text = "PRESENTES DA LIVE"; textSize = 13f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.WHITE)
-        })
-        GiftRuleStore.load(this).take(4).forEach { rule ->
-            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-            val entry = GiftRuleStore.giftCatalog(this).firstOrNull { it.name.equals(rule.giftName, true) }
-            val image = rule.imageUrl.ifBlank { entry?.imageUrl.orEmpty() }
-            row.addView(TextView(this).apply {
-                text = if (image.isBlank()) entry?.emoji ?: rule.icon else "◉"
-                textSize = 22f; setTextColor(Color.WHITE); setPadding(0, dp(3), dp(8), dp(3))
+        val firstRule = GiftRuleStore.load(this).firstOrNull()
+        if (firstRule == null) {
+            box.addView(TextView(this).apply {
+                text = "Nenhum presente configurado"; textSize = 12f; setTextColor(Color.WHITE)
             })
-            val detail = GiftRuleStore.actionLabel(rule.actionType) +
-                (rule.value.takeIf { it.isNotBlank() }?.let { " • " + it } ?: "")
+        } else {
+            val entry = GiftRuleStore.giftCatalog(this).firstOrNull { it.name.equals(firstRule.giftName, true) }
+            val image = firstRule.imageUrl.ifBlank { entry?.imageUrl.orEmpty() }
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
             row.addView(TextView(this).apply {
-                text = rule.giftName + "\n" + detail; textSize = 11f; setTextColor(Color.WHITE)
+                text = if (image.isBlank()) entry?.emoji ?: firstRule.icon else "◉"
+                textSize = 26f; setTextColor(Color.WHITE); setPadding(0, dp(4), dp(8), dp(4))
+            })
+            val detail = GiftRuleStore.actionLabel(firstRule.actionType) +
+                (firstRule.value.takeIf { it.isNotBlank() }?.let { " • " + it } ?: "")
+            row.addView(TextView(this).apply {
+                text = firstRule.giftName + "\n" + detail; textSize = 12f; setTextColor(Color.WHITE)
             })
             box.addView(row)
         }
