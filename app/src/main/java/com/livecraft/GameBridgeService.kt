@@ -185,7 +185,7 @@ class GameBridgeService : Service() {
     }
 
     fun handleTikTokGift(giftName: String, diamondTotal: Long, isCombo: Boolean = false, isStreakOver: Boolean = true): Boolean {
-        val action = GiftRuleEngine().handle(
+        val action = GiftRuleEngine(GiftRuleStore.load(this)).handle(
             LiveGiftEvent(giftName = giftName, diamondTotal = diamondTotal, isCombo = isCombo, isStreakOver = isStreakOver)
         ) ?: return false
         val sent = sendCommand(action.command)
