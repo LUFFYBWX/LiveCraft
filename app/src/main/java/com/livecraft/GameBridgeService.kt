@@ -184,7 +184,8 @@ class GameBridgeService : Service() {
         super.onDestroy()
     }
 
-    fun handleTikTokGift(giftName: String, diamondTotal: Long, isCombo: Boolean = false, isStreakOver: Boolean = true): Boolean {
+    fun handleTikTokGift(giftName: String, imageUrl: String, diamondTotal: Long, isCombo: Boolean = false, isStreakOver: Boolean = true): Boolean {
+        GiftRuleStore.rememberGift(this, giftName, imageUrl)
         val action = GiftRuleEngine(GiftRuleStore.load(this)).handle(
             LiveGiftEvent(giftName = giftName, diamondTotal = diamondTotal, isCombo = isCombo, isStreakOver = isStreakOver)
         ) ?: run {
@@ -282,8 +283,8 @@ class GameBridgeService : Service() {
         }
 
         @JvmStatic
-        fun onNativeTikTokGift(giftName: String, diamondTotal: Long, isCombo: Boolean, isStreakOver: Boolean) {
-            instance?.handleTikTokGift(giftName, diamondTotal, isCombo, isStreakOver)
+        fun onNativeTikTokGift(giftName: String, imageUrl: String, diamondTotal: Long, isCombo: Boolean, isStreakOver: Boolean) {
+            instance?.handleTikTokGift(giftName, imageUrl, diamondTotal, isCombo, isStreakOver)
         }
 
         @JvmStatic
