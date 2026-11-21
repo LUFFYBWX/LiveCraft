@@ -187,7 +187,10 @@ class GameBridgeService : Service() {
     fun handleTikTokGift(giftName: String, diamondTotal: Long, isCombo: Boolean = false, isStreakOver: Boolean = true): Boolean {
         val action = GiftRuleEngine(GiftRuleStore.load(this)).handle(
             LiveGiftEvent(giftName = giftName, diamondTotal = diamondTotal, isCombo = isCombo, isStreakOver = isStreakOver)
-        ) ?: return false
+        ) ?: run {
+            update("Presente ainda não configurado: " + giftName, "Novo presente detectado: " + giftName + ". Cadastre esse nome no editor.")
+            return false
+        }
         val sent = sendCommand(action.command)
         update(
             if (sent) "Presente recebido: ${action.giftName}" else "Presente recebido, mas Minecraft desconectado",
