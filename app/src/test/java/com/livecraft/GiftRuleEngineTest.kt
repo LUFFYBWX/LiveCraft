@@ -58,6 +58,20 @@ class GiftRuleEngineTest {
         assertNull(custom.handle(LiveGiftEvent("Bad", 5)))
     }
 
+    @Test fun expandedEntertainmentCommandsAreAvailable() {
+        val rules = listOf(
+            GiftRule("Launch", "COMMAND", "tp_high"),
+            GiftRule("Dragon", "COMMAND", "dragon_sound"),
+            GiftRule("Warden", "COMMAND", "spawn_warden"),
+            GiftRule("Clear", "COMMAND", "clear_inventory")
+        )
+        val expanded = GiftRuleEngine(rules)
+        assertEquals("tp @p ~ ~40 ~", expanded.handle(LiveGiftEvent("Launch", 1))?.command)
+        assertEquals("playsound mob.enderdragon.growl @a ~ ~ ~ 1 1", expanded.handle(LiveGiftEvent("Dragon", 1))?.command)
+        assertEquals("summon warden ~ ~1 ~", expanded.handle(LiveGiftEvent("Warden", 1))?.command)
+        assertEquals("clear @p", expanded.handle(LiveGiftEvent("Clear", 1))?.command)
+    }
+
     @Test fun unfinishedComboIsIgnored() {
         assertNull(engine.handle(LiveGiftEvent("Rose", 1, repeatCount = 4, isCombo = true, isStreakOver = false)))
     }
