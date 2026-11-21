@@ -2,6 +2,7 @@ package com.livecraft
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -9,19 +10,22 @@ import android.os.Bundle
 import android.text.InputType
 import android.view.View
 import android.widget.*
+import java.net.HttpURLConnection
+import java.net.URL
 
 class GiftRulesActivity : Activity() {
     private val rules = mutableListOf<GiftRule>()
     private lateinit var list: LinearLayout
     private val types = GiftRuleStore.ACTION_TYPES
     private val labels get() = types.map { GiftRuleStore.actionLabel(it) }
+    private val catalog get() = GiftRuleStore.giftCatalog(this)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         rules.addAll(GiftRuleStore.load(this))
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(20, 24, 20, 20); setBackgroundColor(Color.BLACK) }
         root.addView(label("PRESENTES E AÇÕES", 24f, Color.WHITE, true))
-        root.addView(label("Escolha por nome. Não precisa decorar IDs.", 14f, 0xFFCCCCCC.toInt()))
+        root.addView(label("Biblioteca com presentes conhecidos e ícones reais. Presentes novos entram quando aparecem na LIVE.", 14f, 0xFFCCCCCC.toInt()))
         root.addView(button("+ ADICIONAR PRESENTE") { edit(null) })
         root.addView(button("RESTAURAR PRESENTES PADRÃO") { restoreDefaults() })
         list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
@@ -43,9 +47,20 @@ class GiftRulesActivity : Activity() {
 
     private fun render() {
         list.removeAllViews()
+        list.addView(label("BIBLIOTECA: " + catalog.size + " PRESENTES", 13f, Color.WHITE, true))
         rules.forEachIndexed { i, rule ->
             val card = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(12, 10, 12, 10); background = rounded(16, Color.BLACK, Color.WHITE) }
-            card.addView(label(rule.icon + "  " + rule.giftName, 17f, Color.WHITE, true))
+            val giftRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL }
+            val giftImageUrl = rule.imageUrl.ifBlank { catalog.firstOrNull { it.name.equals(rule.giftName, true) }?.imageUrl.orEmpty() }
+            if (giftImageUrl.isNotBlank()) {
+                val image = ImageView(this).apply { layoutParams = LinearLayout.LayoutParams(dp(44), dp(44)); scaleType = ImageView.ScaleType.FIT_CENTER; tag = giftImageUrl }
+                loadGiftImage(giftImageUrl, image)
+                giftRow.addView(image)
+            } else {
+                giftRow.addView(label(rule.icon, 30f, Color.WHITE))
+            }
+            giftRow.addView(label(rule.giftName, 17f, Color.WHITE, true).apply { setPadding(10, 5, 0, 5) })
+            card.addView(giftRow)
             val detail = GiftRuleStore.actionLabel(rule.actionType) + if (rule.value.isNotBlank()) " • " + display(rule.actionType, rule.value) else ""
             card.addView(label(detail, 13f, 0xFFBBBBBB.toInt()))
             val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
@@ -60,7 +75,35 @@ class GiftRulesActivity : Activity() {
     private fun edit(index: Int?) {
         val old = index?.let { rules[it] }
         val form = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(18, 6, 18, 0) }
-        val name = EditText(this).apply { hint = "Nome exato do presente na LIVE"; setSingleLine(); setText(old?.giftName.orEmpty()) }
+        val entries = catalog
+        val name = AutoCompleteTextView(this).apply {
+            hint = "Selecione ou digite o nome exato"
+            setSingleLine()
+            setText(old?.giftName.orEmpty())
+            threshold = 1
+            setAdapter(ArrayAdapter(this@GiftRulesActivity, android.R.layout.simple_dropdown_item_1line, entries.map { it.name }))
+        }
+        val preview = ImageView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(64), dp(64))
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            setBackgroundColor(0xFF171717.toInt())
+        }
+        var selectedImageUrl = old?.imageUrl.orEmpty().ifBlank { entries.firstOrNull { it.name.equals(old?.giftName, true) }?.imageUrl.orEmpty() }
+        if (selectedImageUrl.isNotBlank()) loadGiftImage(selectedImageUrl, preview)
+        fun selectGift(giftName: String) {
+            val entry = entries.firstOrNull { it.name.equals(giftName.trim(), true) }
+            selectedImageUrl = entry?.imageUrl.orEmpty()
+            preview.setImageDrawable(null)
+            if (selectedImageUrl.isNotBlank()) loadGiftImage(selectedImageUrl, preview)
+        }
+        name.setOnItemClickListener { _, _, position, _ -> selectGift(entries.firstOrNull { it.name.equals(name.text.toString(), true) }?.name ?: name.text.toString()) }
+        val chooseGift = button("ABRIR BIBLIOTECA DE PRESENTES") {
+            val names = entries.map { entry -> entry.name + if (entry.coins > 0) "  •  " + entry.coins + " moedas" else "" }.toTypedArray()
+            AlertDialog.Builder(this).setTitle("Escolha um presente").setItems(names) { _, which ->
+                name.setText(entries[which].name)
+                selectGift(entries[which].name)
+            }.show()
+        }
         val icon = Spinner(this).apply {
             adapter = ArrayAdapter(this@GiftRulesActivity, android.R.layout.simple_spinner_dropdown_item, GiftRuleStore.iconOptions)
             setSelection(GiftRuleStore.iconOptions.indexOf(old?.icon ?: "🎁").coerceAtLeast(0))
@@ -82,27 +125,52 @@ class GiftRulesActivity : Activity() {
             override fun onNothingSelected(parent: AdapterView<*>?) {}
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) { refresh(if (old?.actionType == types[position]) old.value else null) }
         }
-        form.addView(label("NOME DO PRESENTE", 12f, Color.DKGRAY, true)); form.addView(name)
-        form.addView(label("ÍCONE", 12f, Color.DKGRAY, true)); form.addView(icon)
-        form.addView(label("AÇÃO", 12f, Color.DKGRAY, true)); form.addView(action)
-        form.addView(label("ESCOLHA UMA OPÇÃO", 12f, Color.DKGRAY, true)); form.addView(choice); form.addView(amount)
-        form.addView(label("Mobs, itens, efeitos e comandos aparecem por nome. Os IDs ficam escondidos.", 12f, Color.DKGRAY))
+        form.addView(label("PRESENTE", 12f, Color.DKGRAY, true))
+        form.addView(name)
+        form.addView(chooseGift)
+        form.addView(preview)
+        form.addView(label("ÍCONE ALTERNATIVO (se não houver imagem)", 12f, Color.DKGRAY, true))
+        form.addView(icon)
+        form.addView(label("AÇÃO", 12f, Color.DKGRAY, true))
+        form.addView(action)
+        form.addView(label("ESCOLHA UMA OPÇÃO", 12f, Color.DKGRAY, true))
+        form.addView(choice)
+        form.addView(amount)
+        form.addView(label("Os ícones oficiais são guardados automaticamente quando o presente aparece na LIVE.", 12f, Color.DKGRAY))
         AlertDialog.Builder(this).setTitle(if (old == null) "Novo presente" else "Editar presente").setView(form)
             .setNegativeButton("Cancelar", null).setPositiveButton("SALVAR") { _, _ ->
                 val gift = name.text.toString().trim()
                 val type = types[action.selectedItemPosition]
                 val opts = options(type)
                 val value = if (opts.isNotEmpty()) opts.getOrNull(choice.selectedItemPosition)?.second.orEmpty() else ""
-                if (gift.isBlank()) { Toast.makeText(this, "Digite o nome do presente.", Toast.LENGTH_SHORT).show(); return@setPositiveButton }
+                if (gift.isBlank()) { Toast.makeText(this, "Escolha ou digite o nome do presente.", Toast.LENGTH_SHORT).show(); return@setPositiveButton }
                 if (type in listOf("SUMMON", "GIVE", "EFFECT", "COMMAND") && value.isBlank()) { Toast.makeText(this, "Escolha uma opção.", Toast.LENGTH_SHORT).show(); return@setPositiveButton }
                 val selectedIcon = GiftRuleStore.iconOptions.getOrElse(icon.selectedItemPosition) { "🎁" }
-                val rule = GiftRule(gift, type, value, amount.text.toString().toIntOrNull()?.coerceIn(1, 64) ?: 1, selectedIcon)
+                val savedImage = selectedImageUrl.ifBlank { entries.firstOrNull { it.name.equals(gift, true) }?.imageUrl.orEmpty() }
+                val rule = GiftRule(gift, type, value, amount.text.toString().toIntOrNull()?.coerceIn(1, 64) ?: 1, selectedIcon, savedImage)
                 var target = old?.let { rules.indexOfFirst { r -> r.giftName.equals(it.giftName, true) } } ?: -1
                 val duplicate = rules.indexOfFirst { it.giftName.equals(gift, true) }
                 if (duplicate >= 0 && duplicate != target) { rules.removeAt(duplicate); if (target > duplicate) target-- }
                 if (target < 0) rules.add(rule) else rules[target] = rule
                 save()
             }.show()
+    }
+
+    private fun loadGiftImage(url: String, target: ImageView) {
+        if (!url.startsWith("https://")) return
+        target.tag = url
+        Thread {
+            val bitmap = try {
+                val connection = URL(url).openConnection() as HttpURLConnection
+                connection.connectTimeout = 5000
+                connection.readTimeout = 5000
+                connection.instanceFollowRedirects = true
+                connection.inputStream.use { BitmapFactory.decodeStream(it) }.also { connection.disconnect() }
+            } catch (_: Exception) { null }
+            if (bitmap != null) runOnUiThread {
+                if (target.tag == url) target.setImageBitmap(bitmap)
+            }
+        }.start()
     }
 
     private fun restoreDefaults() {
@@ -120,7 +188,9 @@ class GiftRulesActivity : Activity() {
         AlertDialog.Builder(this).setMessage("Remover a regra de " + rules[index].giftName + "?")
             .setNegativeButton("Cancelar", null).setPositiveButton("REMOVER") { _, _ -> rules.removeAt(index); save() }.show()
     }
+
     private fun save() { GiftRuleStore.save(this, rules); render() }
+    private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     private fun rounded(radius: Int, fill: Int, stroke: Int) = GradientDrawable().apply {
         setColor(fill); cornerRadius = radius * resources.displayMetrics.density
         setStroke(resources.displayMetrics.density.toInt().coerceAtLeast(1), stroke)
