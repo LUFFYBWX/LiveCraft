@@ -43,7 +43,9 @@ object GiftRuleStore {
         if (!prefs.getBoolean("gift_catalog_seeded_v1", false)) {
             val merged = loaded.toMutableList()
             defaults().forEach { preset ->
-                if (merged.none { it.giftName.equals(preset.giftName, true) }) merged.add(preset)
+                val existingIndex = merged.indexOfFirst { it.giftName.equals(preset.giftName, true) }
+                if (existingIndex < 0) merged.add(preset)
+                else if (merged[existingIndex].icon == "🎁") merged[existingIndex] = merged[existingIndex].copy(icon = preset.icon)
             }
             save(context, merged)
             prefs.edit().putBoolean("gift_catalog_seeded_v1", true).apply()
