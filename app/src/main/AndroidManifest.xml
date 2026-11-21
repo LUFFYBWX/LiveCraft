@@ -8,7 +8,9 @@
 
     <application
         android:allowBackup="false"
-        android:label="LiveCraft"
+        android:label="PatoHub"
+        android:icon="@drawable/patohub_icon"
+        android:roundIcon="@drawable/patohub_icon"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:usesCleartextTraffic="true">
         <activity
