@@ -120,8 +120,20 @@ class PanelPositionActivity : Activity() {
         return box
     }
 
+    override fun onResume() {
+        super.onResume()
+        val prefs = getSharedPreferences("livecraft", MODE_PRIVATE)
+        if (prefs.getBoolean("pending_panel_overlay_permission", false) &&
+            android.os.Build.VERSION.SDK_INT >= 23 && android.provider.Settings.canDrawOverlays(this)) {
+            prefs.edit().putBoolean("pending_panel_overlay_permission", false).apply()
+            val intent = Intent(this, FloatingOverlayService::class.java).setAction(FloatingOverlayService.ACTION_PANEL_ON)
+            if (android.os.Build.VERSION.SDK_INT >= 26) startForegroundService(intent) else startService(intent)
+        }
+    }
+
     private fun startOverlay(action: String) {
         if (android.os.Build.VERSION.SDK_INT >= 23 && !android.provider.Settings.canDrawOverlays(this)) {
+            getSharedPreferences("livecraft", MODE_PRIVATE).edit().putBoolean("pending_panel_overlay_permission", true).apply()
             Toast.makeText(this, "Ative a permissão de sobreposição na próxima tela.", Toast.LENGTH_LONG).show()
             startActivity(Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION, android.net.Uri.parse("package:$packageName")))
             return
