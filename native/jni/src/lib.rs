@@ -47,12 +47,12 @@ fn likes(vm: &JavaVM, class: &GlobalRef, count: i32) {
     }
 }
 
-fn gift(vm: &JavaVM, class: &GlobalRef, name: &str, coins: i64, combo: bool, streak_over: bool) {
+fn gift(vm: &JavaVM, class: &GlobalRef, name: &str, image_url: &str, coins: i64, combo: bool, streak_over: bool) {
     if let Ok(mut env) = vm.attach_current_thread() {
-        if let Ok(value) = env.new_string(name) {
+        if let (Ok(value), Ok(image)) = (env.new_string(name), env.new_string(image_url)) {
             let class = <&JClass>::from(class.as_obj());
-            let _ = env.call_static_method(class, "onNativeTikTokGift", "(Ljava/lang/String;JZZ)V", &[
-                JValue::Object(&value), JValue::Long(coins),
+            let _ = env.call_static_method(class, "onNativeTikTokGift", "(Ljava/lang/String;Ljava/lang/String;JZZ)V", &[
+                JValue::Object(&value), JValue::Object(&image), JValue::Long(coins),
                 JValue::Bool(combo as jboolean), JValue::Bool(streak_over as jboolean),
             ]);
         }
@@ -108,8 +108,14 @@ pub extern "system" fn Java_com_livecraft_TikTokNative_nativeStart(mut env: JNIE
                                                 chat(&vm, &thread_class, author, &event.comment);
                                             }
                                             Ok(TikTokLiveEvent::Gift(event)) => {
-                                                let name = event.gift_details.as_ref().map(|details| details.gift_name.as_str()).unwrap_or("Presente");
-                                                gift(&vm, &thread_class, name, event.diamond_total(), event.is_combo_gift(), event.is_streak_over());
+                                                let details = event.gift_details.as_ref();
+                                                let name = details.map(|gift| gift.gift_name.as_str()).unwrap_or("Presente");
+                                                let image_url = details
+                                                    .and_then(|gift| gift.gift_image.as_ref().or(gift.icon.as_ref()))
+                                                    .and_then(|image| image.url_list.first())
+                                                    .map(String::as_str)
+                                                    .unwrap_or("");
+                                                gift(&vm, &thread_class, name, image_url, event.diamond_total(), event.is_combo_gift(), event.is_streak_over());
                                             }
                                             Ok(TikTokLiveEvent::Like(event)) => {
                                                 likes(&vm, &thread_class, event.like_count);
