@@ -17,9 +17,9 @@ object GiftRuleStore {
     val commands = listOf("☀️ Mudar para dia" to "time_day", "🌙 Mudar para noite" to "time_night", "🌤️ Limpar clima" to "weather_clear", "🌧️ Chuva" to "weather_rain", "⛈️ Tempestade" to "weather_thunder", "⭐ Dar 5 níveis de XP" to "xp_5", "⬆️ Teleportar para cima" to "tp_up", "💥 Invocar TNT" to "tnt")
     val iconOptions = listOf("🌹", "🤍", "🦖", "🦫", "🎵", "🫶", "💐", "💎", "🍩", "🍦", "❤️", "🎉", "🕊️", "🎁", "⭐", "🐸")
     fun defaults() = listOf(
-        GiftRule("Rose", "SUMMON", "zombie"), GiftRule("Rosa", "SUMMON", "zombie"),
-        GiftRule("White Rose", "GIVE", "golden_apple"), GiftRule("Rosa Branca", "GIVE", "golden_apple"),
-        GiftRule("Mini Dino", "CLEAR"), GiftRule("Capybara", "KILL", icon = "🦫"), GiftRule("Capivara", "KILL", icon = "🦫"),
+        GiftRule("Rose", "SUMMON", "zombie", icon = "🌹"), GiftRule("Rosa", "SUMMON", "zombie", icon = "🌹"),
+        GiftRule("White Rose", "GIVE", "golden_apple", icon = "🤍"), GiftRule("Rosa Branca", "GIVE", "golden_apple", icon = "🤍"),
+        GiftRule("Mini Dino", "CLEAR", icon = "🦖"), GiftRule("Capybara", "KILL", icon = "🦫"), GiftRule("Capivara", "KILL", icon = "🦫"),
         GiftRule("TikTok", "SUMMON", "creeper", icon = "🎵"), GiftRule("Finger Heart", "HEAL", icon = "🫶"),
         GiftRule("Perfume", "EFFECT", "speed", 2, "💐"), GiftRule("GG", "GIVE", "diamond", 1, "💎"),
         GiftRule("Doughnut", "FEED", icon = "🍩"), GiftRule("Ice Cream", "EFFECT", "regeneration", 2, "🍦"),
