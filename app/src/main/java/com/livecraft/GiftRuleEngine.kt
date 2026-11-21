@@ -27,8 +27,9 @@ object GiftRuleStore {
         GiftRule("Paper Crane", "GIVE", "emerald", 1, "🕊️")
     )
     fun load(context: Context): List<GiftRule> {
-        val raw = context.getSharedPreferences("livecraft", Context.MODE_PRIVATE).getString(KEY_RULES, null) ?: return defaults()
-        return try {
+        val prefs = context.getSharedPreferences("livecraft", Context.MODE_PRIVATE)
+        val raw = prefs.getString(KEY_RULES, null)
+        val loaded = if (raw == null) defaults() else try {
             val array = JSONArray(raw)
             buildList {
                 for (i in 0 until array.length()) {
@@ -39,6 +40,16 @@ object GiftRuleStore {
                 }
             }
         } catch (_: Exception) { defaults() }
+        if (!prefs.getBoolean("gift_catalog_seeded_v1", false)) {
+            val merged = loaded.toMutableList()
+            defaults().forEach { preset ->
+                if (merged.none { it.giftName.equals(preset.giftName, true) }) merged.add(preset)
+            }
+            save(context, merged)
+            prefs.edit().putBoolean("gift_catalog_seeded_v1", true).apply()
+            return merged
+        }
+        return loaded
     }
     fun save(context: Context, rules: List<GiftRule>) {
         val array = JSONArray()
