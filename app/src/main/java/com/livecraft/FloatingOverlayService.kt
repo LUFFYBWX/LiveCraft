@@ -48,7 +48,7 @@ class FloatingOverlayService : Service() {
             ACTION_BUBBLE_OFF -> { prefs().edit().putBoolean(KEY_BUBBLE, false).apply(); removeBubble() }
             ACTION_PANEL_ON -> { prefs().edit().putBoolean(KEY_PANEL, true).apply(); showPanel() }
             ACTION_PANEL_OFF -> { prefs().edit().putBoolean(KEY_PANEL, false).apply(); removePanel() }
-            ACTION_REFRESH -> { refreshPanel() }
+            ACTION_REFRESH -> { if (panel == null && prefs().getBoolean(KEY_PANEL, false)) showPanel() else refreshPanel() }
             else -> {
                 if (prefs().getBoolean(KEY_BUBBLE, false)) showBubble()
                 if (prefs().getBoolean(KEY_PANEL, false)) showPanel()
@@ -154,7 +154,7 @@ class FloatingOverlayService : Service() {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(12), dp(10), dp(12), dp(10))
             background = GradientDrawable().apply {
-                setColor(0xE6000000.toInt())
+                setColor(0xBF000000.toInt())
                 cornerRadius = dp(16).toFloat()
                 setStroke(dp(1), Color.WHITE)
             }
