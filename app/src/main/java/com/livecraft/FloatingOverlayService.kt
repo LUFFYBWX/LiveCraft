@@ -8,6 +8,8 @@ import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.IBinder
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.view.*
 import android.widget.*
@@ -238,7 +240,7 @@ class FloatingOverlayService : Service() {
                 connection.connectTimeout = 5000; connection.readTimeout = 5000
                 connection.inputStream.use { BitmapFactory.decodeStream(it) }.also { connection.disconnect() }
             } catch (_: Exception) { null }
-            if (bitmap != null) runOnUiThread { if (target.tag == url) target.setImageBitmap(bitmap) }
+            if (bitmap != null) Handler(Looper.getMainLooper()).post { if (target.tag == url) target.setImageBitmap(bitmap) }
         }.start()
     }
 
