@@ -48,6 +48,16 @@ class GiftRuleEngineTest {
         assertNull(custom.handle(LiveGiftEvent("Bad", 5)))
     }
 
+    @Test fun presetCommandCanChangeWorldTime() {
+        val custom = GiftRuleEngine(listOf(GiftRule("Night", "COMMAND", "time_night")))
+        assertEquals("time set night", custom.handle(LiveGiftEvent("Night", 5))?.command)
+    }
+
+    @Test fun presetCommandRejectsUnknownKeys() {
+        val custom = GiftRuleEngine(listOf(GiftRule("Bad", "COMMAND", "kill_all")))
+        assertNull(custom.handle(LiveGiftEvent("Bad", 5)))
+    }
+
     @Test fun unfinishedComboIsIgnored() {
         assertNull(engine.handle(LiveGiftEvent("Rose", 1, repeatCount = 4, isCombo = true, isStreakOver = false)))
     }
