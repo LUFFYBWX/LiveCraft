@@ -306,16 +306,19 @@ class GiftRuleEngine(private val rules: List<GiftRule> = GiftRuleStore.defaults(
         return clean.takeIf { it.matches(Regex("[a-z0-9_.:-]{1,64}")) }
     }
     private fun kit(): List<String> {
-        fun give(item: String, levels: String) = "give @p $item 1 0 {\\"minecraft:enchantments\\":{\\"levels\\":{$levels}}}"
+        fun give(item: String, levels: String): String {
+            val components = """{"minecraft:enchantments":{"levels":{$levels}}}"""
+            return "give @p $item 1 0 $components"
+        }
         return listOf(
-            give("netherite_helmet", "\\"protection\\":4,\\"unbreaking\\":3,\\"mending\\":1"),
-            give("netherite_chestplate", "\\"protection\\":4,\\"unbreaking\\":3,\\"mending\\":1"),
-            give("netherite_leggings", "\\"protection\\":4,\\"unbreaking\\":3,\\"mending\\":1"),
-            give("netherite_boots", "\\"protection\\":4,\\"feather_falling\\":4,\\"unbreaking\\":3,\\"mending\\":1"),
-            give("netherite_sword", "\\"sharpness\\":5,\\"looting\\":3,\\"unbreaking\\":3,\\"mending\\":1"),
-            give("netherite_pickaxe", "\\"efficiency\\":5,\\"fortune\\":3,\\"unbreaking\\":3,\\"mending\\":1"),
-            give("netherite_axe", "\\"efficiency\\":5,\\"sharpness\\":5,\\"unbreaking\\":3,\\"mending\\":1"),
-            give("netherite_shovel", "\\"efficiency\\":5,\\"unbreaking\\":3,\\"mending\\":1")
+            give("netherite_helmet", """"protection":4,"unbreaking":3,"mending":1"""),
+            give("netherite_chestplate", """"protection":4,"unbreaking":3,"mending":1"""),
+            give("netherite_leggings", """"protection":4,"unbreaking":3,"mending":1"""),
+            give("netherite_boots", """"protection":4,"feather_falling":4,"unbreaking":3,"mending":1"""),
+            give("netherite_sword", """"sharpness":5,"looting":3,"unbreaking":3,"mending":1"""),
+            give("netherite_pickaxe", """"efficiency":5,"fortune":3,"unbreaking":3,"mending":1"""),
+            give("netherite_axe", """"efficiency":5,"sharpness":5,"unbreaking":3,"mending":1"""),
+            give("netherite_shovel", """"efficiency":5,"unbreaking":3,"mending":1""")
         )
     }
     private fun single(type: String, value: String, rawAmount: Int): List<String> {
