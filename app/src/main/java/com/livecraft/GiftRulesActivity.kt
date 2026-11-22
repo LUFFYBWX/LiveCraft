@@ -158,73 +158,125 @@ class GiftRulesActivity : Activity() {
     private fun openGiftLibrary(entries: List<GiftCatalogEntry>, onSelect: (GiftCatalogEntry) -> Unit) {
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(10), dp(8), dp(10), dp(8))
-            setBackgroundColor(0xFF1E1E1E.toInt())
+            setPadding(dp(14), dp(14), dp(14), dp(10))
+            setBackgroundColor(0xFF101010.toInt())
         }
+        val heading = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+        }
+        val headingText = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        headingText.addView(TextView(this).apply {
+            text = "Escolha um presente"
+            textSize = 20f
+            setTextColor(Color.WHITE)
+            typeface = Typeface.DEFAULT_BOLD
+        })
+        val count = TextView(this).apply {
+            text = entries.size.toString() + " presentes disponíveis"
+            textSize = 12f
+            setTextColor(0xFFAAAAAA.toInt())
+            setPadding(0, dp(3), 0, 0)
+        }
+        headingText.addView(count)
+        heading.addView(headingText, LinearLayout.LayoutParams(0, -2, 1f))
+        content.addView(heading)
+
+        val search = EditText(this).apply {
+            hint = "Pesquisar presente..."
+            setSingleLine(true)
+            textSize = 14f
+            setTextColor(Color.WHITE)
+            setHintTextColor(0xFF999999.toInt())
+            inputType = android.text.InputType.TYPE_CLASS_TEXT
+            background = rounded(14, 0xFF242424.toInt(), 0xFF555555.toInt())
+            setCompoundDrawablesWithIntrinsicBounds(android.R.drawable.ic_menu_search, 0, 0, 0)
+            compoundDrawablePadding = dp(8)
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+        }
+        val searchParams = LinearLayout.LayoutParams(-1, dp(48))
+        searchParams.topMargin = dp(14)
+        searchParams.bottomMargin = dp(10)
+        content.addView(search, searchParams)
+
         val scroll = ScrollView(this)
         val grid = android.widget.GridLayout(this).apply {
             columnCount = 4
             useDefaultMargins = false
         }
-        entries.forEach { entry ->
-            val tile = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                gravity = android.view.Gravity.CENTER
-                setPadding(dp(4), dp(8), dp(4), dp(8))
-                isClickable = true
-                isFocusable = true
-                background = rounded(12, 0xFF292929.toInt(), 0xFF454545.toInt())
+        val empty = TextView(this).apply {
+            text = "Nenhum presente encontrado"
+            textSize = 14f
+            setTextColor(0xFFBBBBBB.toInt())
+            gravity = android.view.Gravity.CENTER
+            visibility = View.GONE
+            setPadding(0, dp(36), 0, dp(36))
+        }
+        fun renderGrid(query: String) {
+            grid.removeAllViews()
+            val filtered = entries.filter { it.name.contains(query.trim(), ignoreCase = true) }
+            count.text = if (query.isBlank()) "${entries.size} presentes disponíveis" else "${filtered.size} resultado(s)"
+            empty.visibility = if (filtered.isEmpty()) View.VISIBLE else View.GONE
+            filtered.forEach { entry ->
+                val tile = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    gravity = android.view.Gravity.CENTER
+                    setPadding(dp(4), dp(9), dp(4), dp(8))
+                    isClickable = true
+                    isFocusable = true
+                    background = rounded(14, 0xFF202020.toInt(), 0xFF484848.toInt())
+                }
+                val image = ImageView(this).apply {
+                    layoutParams = LinearLayout.LayoutParams(dp(58), dp(58))
+                    scaleType = ImageView.ScaleType.FIT_CENTER
+                    contentDescription = entry.name
+                }
+                if (entry.imageUrl.isNotBlank()) loadGiftImage(entry.imageUrl, image)
+                else image.setImageResource(android.R.drawable.ic_menu_gallery)
+                tile.addView(image)
+                tile.addView(TextView(this).apply {
+                    text = entry.name
+                    textSize = 11f
+                    setTextColor(Color.WHITE)
+                    gravity = android.view.Gravity.CENTER
+                    maxLines = 2
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                    setPadding(0, dp(5), 0, 0)
+                })
+                tile.addView(TextView(this).apply {
+                    text = "◆ " + entry.coins
+                    textSize = 10f
+                    setTextColor(0xFFFFD45C.toInt())
+                    gravity = android.view.Gravity.CENTER
+                    setPadding(0, dp(3), 0, 0)
+                })
+                tile.setOnClickListener { onSelect(entry); dialog.dismiss() }
+                val params = android.widget.GridLayout.LayoutParams().apply {
+                    width = 0
+                    height = -2
+                    columnSpec = android.widget.GridLayout.spec(android.widget.GridLayout.UNDEFINED, 1f)
+                    setMargins(dp(3), dp(3), dp(3), dp(3))
+                }
+                grid.addView(tile, params)
             }
-            val image = ImageView(this).apply {
-                layoutParams = LinearLayout.LayoutParams(dp(58), dp(58))
-                scaleType = ImageView.ScaleType.FIT_CENTER
-                contentDescription = entry.name
-            }
-            if (entry.imageUrl.isNotBlank()) loadGiftImage(entry.imageUrl, image)
-            else image.setImageResource(android.R.drawable.ic_menu_gallery)
-            tile.addView(image)
-            tile.addView(TextView(this).apply {
-                text = entry.name
-                textSize = 11f
-                setTextColor(Color.WHITE)
-                gravity = android.view.Gravity.CENTER
-                maxLines = 2
-                ellipsize = android.text.TextUtils.TruncateAt.END
-                setPadding(0, dp(4), 0, 0)
-            })
-            tile.addView(TextView(this).apply {
-                text = "🪙 " + entry.coins
-                textSize = 10f
-                setTextColor(0xFFFFD54F.toInt())
-                gravity = android.view.Gravity.CENTER
-                setPadding(0, dp(3), 0, 0)
-            })
-            tile.setOnClickListener {
-                onSelect(entry)
-                (tile.parent?.parent as? android.view.View)?.let { }
-            }
-            val params = android.widget.GridLayout.LayoutParams().apply {
-                width = 0
-                height = -2
-                columnSpec = android.widget.GridLayout.spec(android.widget.GridLayout.UNDEFINED, 1f)
-                setMargins(dp(3), dp(3), dp(3), dp(3))
-            }
-            grid.addView(tile, params)
         }
         scroll.addView(grid)
-        content.addView(scroll, LinearLayout.LayoutParams(-1, dp(440)))
-        val dialog = AlertDialog.Builder(this).setTitle("Biblioteca de presentes")
-            .setView(content).setNegativeButton("FECHAR", null).create()
-        // Each tile selects the gift and closes the library.
-        for (i in 0 until grid.childCount) {
-            val tile = grid.getChildAt(i)
-            tile.setOnClickListener {
-                onSelect(entries[i])
-                dialog.dismiss()
-            }
+        val body = FrameLayout(this).apply {
+            addView(scroll, FrameLayout.LayoutParams(-1, -1))
+            addView(empty, FrameLayout.LayoutParams(-1, -2, android.view.Gravity.CENTER))
         }
+        content.addView(body, LinearLayout.LayoutParams(-1, dp(430)))
+        val dialog = AlertDialog.Builder(this).setView(content)
+            .setNegativeButton("FECHAR", null).create()
+        // Grid is rebuilt as the user types; the dialog closes after a selection.
+        search.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { renderGrid(s?.toString().orEmpty()) }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
+        renderGrid("")
         dialog.show()
-        dialog.window?.setLayout((resources.displayMetrics.widthPixels * 0.94f).toInt(), -2)
+        dialog.window?.setLayout((resources.displayMetrics.widthPixels * 0.96f).toInt(), -2)
     }
 
     private fun loadGiftImage(url: String, target: ImageView) {
