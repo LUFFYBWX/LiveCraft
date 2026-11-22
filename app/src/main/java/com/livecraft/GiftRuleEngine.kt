@@ -139,6 +139,20 @@ object GiftRuleStore {
 
     fun giftCatalog(context: Context): List<GiftCatalogEntry> {
         val all = builtInGiftCatalog.associateBy { it.name.lowercase() }.toMutableMap()
+        try {
+            val catalogJson = context.assets.open("gift_catalog.json").bufferedReader().use { it.readText() }
+            val catalogArray = JSONArray(catalogJson)
+            for (i in 0 until catalogArray.length()) {
+                val entry = catalogArray.optJSONObject(i) ?: continue
+                val name = entry.optString("name").trim()
+                val image = entry.optString("imageUrl").trim()
+                if (name.isNotBlank() && image.startsWith("https://")) {
+                    val coins = entry.optInt("coins", 0)
+                    val existing = all[name.lowercase()]
+                    all[name.lowercase()] = GiftCatalogEntry(name, coins, image, existing?.emoji ?: "🎁")
+                }
+            }
+        } catch (_: Exception) {}
         val raw = context.getSharedPreferences("livecraft", Context.MODE_PRIVATE).getString(KEY_SEEN_GIFTS, null)
         if (!raw.isNullOrBlank()) try {
             val array = JSONArray(raw)
