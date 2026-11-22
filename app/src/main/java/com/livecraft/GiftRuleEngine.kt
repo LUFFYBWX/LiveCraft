@@ -138,7 +138,7 @@ object GiftRuleStore {
     )
 
     fun giftCatalog(context: Context): List<GiftCatalogEntry> {
-        val all = builtInGiftCatalog.associateBy { it.name.lowercase() }.toMutableMap()
+        val all = mutableMapOf<String, GiftCatalogEntry>()
         try {
             val catalogJson = context.assets.open("gift_catalog.json").bufferedReader().use { it.readText() }
             val catalogArray = JSONArray(catalogJson)
