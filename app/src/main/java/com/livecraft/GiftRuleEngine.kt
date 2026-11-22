@@ -5,14 +5,14 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 data class LiveGiftEvent(val giftName: String, val diamondTotal: Long, val repeatCount: Int = 1, val isCombo: Boolean = false, val isStreakOver: Boolean = true)
-data class GiftAction(val giftName: String, val diamondTotal: Long, val command: String)
+data class GiftAction(val giftName: String, val diamondTotal: Long, val command: String, val commands: List<String> = listOf(command))
 data class GiftRule(val giftName: String, val actionType: String, val value: String = "", val amount: Int = 1, val icon: String = "🎁", val imageUrl: String = "")
 data class GiftCatalogEntry(val name: String, val coins: Int, val imageUrl: String, val emoji: String = "🎁")
 
 object GiftRuleStore {
     private const val KEY_RULES = "gift_rules_v1"
     private const val KEY_SEEN_GIFTS = "gift_catalog_seen_v1"
-    val ACTION_TYPES = listOf("SUMMON", "GIVE", "EFFECT", "COMMAND", "CLEAR", "KILL", "HEAL", "FEED", "LIGHTNING", "SOUND")
+    val ACTION_TYPES = listOf("SUMMON", "GIVE", "EFFECT", "COMMAND", "CLEAR", "KILL", "HEAL", "FEED", "LIGHTNING", "SOUND", "KIT_NETHERITE", "MULTI")
 
     val mobs = listOf(
         "🧟 Zumbi" to "zombie", "💀 Esqueleto" to "skeleton", "💣 Creeper" to "creeper",
@@ -287,6 +287,8 @@ object GiftRuleStore {
         "FEED" -> "Encher fome"
         "LIGHTNING" -> "Invocar raio"
         "SOUND" -> "Tocar som"
+        "KIT_NETHERITE" -> "Kit de netherita encantado"
+        "MULTI" -> "Várias ações"
         else -> "Ação desconhecida"
     }
 }
@@ -295,29 +297,55 @@ class GiftRuleEngine(private val rules: List<GiftRule> = GiftRuleStore.defaults(
     fun handle(event: LiveGiftEvent): GiftAction? {
         if (event.isCombo && !event.isStreakOver) return null
         val rule = rules.firstOrNull { it.giftName.trim().equals(event.giftName.trim(), ignoreCase = true) } ?: return null
-        val command = commandFor(rule) ?: return null
-        return GiftAction(event.giftName, event.diamondTotal, command)
+        val commands = commandsFor(rule)
+        if (commands.isEmpty()) return null
+        return GiftAction(event.giftName, event.diamondTotal, commands.first(), commands)
     }
-
     private fun identifier(value: String): String? {
         val clean = value.trim().lowercase()
         return clean.takeIf { it.matches(Regex("[a-z0-9_.:-]{1,64}")) }
     }
-
-    private fun commandFor(rule: GiftRule): String? {
-        val amount = rule.amount.coerceIn(1, 64)
-        return when (rule.actionType) {
-            "SUMMON" -> identifier(rule.value)?.let { "summon " + it + " ~ ~1 ~" }
-            "GIVE" -> identifier(rule.value)?.let { "give @p " + it + " " + amount }
-            "EFFECT" -> identifier(rule.value)?.let { "effect @p " + it + " 10 " + (amount - 1).coerceAtMost(4) + " true" }
-            "COMMAND" -> GiftRuleStore.commandForPreset(rule.value)
+    private fun kit(): List<String> {
+        fun give(item: String, levels: String) = "give @p $item 1 0 {\\"minecraft:enchantments\\":{\\"levels\\":{$levels}}}"
+        return listOf(
+            give("netherite_helmet", "\\"protection\\":4,\\"unbreaking\\":3,\\"mending\\":1"),
+            give("netherite_chestplate", "\\"protection\\":4,\\"unbreaking\\":3,\\"mending\\":1"),
+            give("netherite_leggings", "\\"protection\\":4,\\"unbreaking\\":3,\\"mending\\":1"),
+            give("netherite_boots", "\\"protection\\":4,\\"feather_falling\\":4,\\"unbreaking\\":3,\\"mending\\":1"),
+            give("netherite_sword", "\\"sharpness\\":5,\\"looting\\":3,\\"unbreaking\\":3,\\"mending\\":1"),
+            give("netherite_pickaxe", "\\"efficiency\\":5,\\"fortune\\":3,\\"unbreaking\\":3,\\"mending\\":1"),
+            give("netherite_axe", "\\"efficiency\\":5,\\"sharpness\\":5,\\"unbreaking\\":3,\\"mending\\":1"),
+            give("netherite_shovel", "\\"efficiency\\":5,\\"unbreaking\\":3,\\"mending\\":1")
+        )
+    }
+    private fun single(type: String, value: String, rawAmount: Int): List<String> {
+        val amount = rawAmount.coerceIn(1, 64)
+        val command = when (type) {
+            "SUMMON" -> identifier(value)?.let { "summon " + it + " ~ ~1 ~" }
+            "GIVE" -> identifier(value)?.let { "give @p " + it + " " + amount }
+            "EFFECT" -> identifier(value)?.let { "effect @p " + it + " 10 " + (amount - 1).coerceAtMost(4) + " true" }
+            "COMMAND" -> GiftRuleStore.commandForPreset(value)
             "CLEAR" -> "clear @p"
             "KILL" -> "kill @p"
             "HEAL" -> "effect @p instant_health 1 255 true"
             "FEED" -> "effect @p saturation 1 255 true"
             "LIGHTNING" -> "summon lightning_bolt ~ ~ ~"
             "SOUND" -> "playsound random.levelup @p"
+            "KIT_NETHERITE" -> return kit()
             else -> null
         }
+        return listOfNotNull(command)
+    }
+    private fun commandsFor(rule: GiftRule): List<String> {
+        if (rule.actionType != "MULTI") return single(rule.actionType, rule.value, rule.amount)
+        return try {
+            val array = JSONArray(rule.value)
+            buildList {
+                for (i in 0 until array.length()) {
+                    val item = array.optJSONObject(i) ?: continue
+                    addAll(single(item.optString("type"), item.optString("value"), item.optInt("amount", 1)))
+                }
+            }
+        } catch (_: Exception) { emptyList() }
     }
 }

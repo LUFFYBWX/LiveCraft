@@ -61,7 +61,7 @@ class GiftRulesActivity : Activity() {
             }
             giftRow.addView(label(rule.giftName, 17f, Color.WHITE, true).apply { setPadding(10, 5, 0, 5) })
             card.addView(giftRow)
-            val detail = GiftRuleStore.actionLabel(rule.actionType) + if (rule.value.isNotBlank()) " • " + display(rule.actionType, rule.value) else ""
+            val detail = if (rule.actionType == "MULTI") "Várias ações configuradas" else GiftRuleStore.actionLabel(rule.actionType) + if (rule.value.isNotBlank()) " • " + display(rule.actionType, rule.value) else ""
             card.addView(label(detail, 13f, 0xFFBBBBBB.toInt()))
             val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
             row.addView(button("EDITAR") { edit(i) }, LinearLayout.LayoutParams(0, -2, 1f))
@@ -113,6 +113,19 @@ class GiftRulesActivity : Activity() {
         }
         val choice = Spinner(this)
         val amount = EditText(this).apply { hint = "Quantidade/nível (1 a 64)"; inputType = InputType.TYPE_CLASS_NUMBER; setSingleLine(); setText((old?.amount ?: 1).toString()) }
+        val pendingActions = org.json.JSONArray()
+        val pendingLabel = label("Nenhuma ação extra adicionada", 12f, Color.DKGRAY)
+        val addAction = button("+ ADICIONAR ESTA AÇÃO À LISTA") {
+            val t = types[action.selectedItemPosition]
+            val opts = options(t)
+            val v = if (opts.isNotEmpty()) opts.getOrNull(choice.selectedItemPosition)?.second.orEmpty() else ""
+            if (t in listOf("SUMMON", "GIVE", "EFFECT", "COMMAND") && v.isBlank()) Toast.makeText(this, "Escolha uma opção.", Toast.LENGTH_SHORT).show()
+            else {
+                pendingActions.put(org.json.JSONObject().put("type", t).put("value", v).put("amount", amount.text.toString().toIntOrNull()?.coerceIn(1,64) ?: 1))
+                pendingLabel.text = "${pendingActions.length()} ação(ões) adicionada(s). Selecione a próxima."
+                action.setSelection(types.indexOf("MULTI"))
+            }
+        }
         fun refresh(selected: String?) {
             val opts = options(types[action.selectedItemPosition])
             choice.adapter = ArrayAdapter(this@GiftRulesActivity, android.R.layout.simple_spinner_dropdown_item, opts.map { it.first })
@@ -135,6 +148,9 @@ class GiftRulesActivity : Activity() {
         form.addView(label("ESCOLHA UMA OPÇÃO", 12f, Color.DKGRAY, true))
         form.addView(choice)
         form.addView(amount)
+        form.addView(addAction)
+        form.addView(pendingLabel)
+        form.addView(label("Você pode combinar invocar mobs, itens, efeitos, comandos e o kit de netherita no mesmo presente.", 12f, Color.DKGRAY))
         form.addView(label("Os ícones oficiais são guardados automaticamente quando o presente aparece na LIVE.", 12f, Color.DKGRAY))
         AlertDialog.Builder(this).setTitle(if (old == null) "Novo presente" else "Editar presente").setView(form)
             .setNegativeButton("Cancelar", null).setPositiveButton("SALVAR") { _, _ ->
@@ -143,10 +159,17 @@ class GiftRulesActivity : Activity() {
                 val opts = options(type)
                 val value = if (opts.isNotEmpty()) opts.getOrNull(choice.selectedItemPosition)?.second.orEmpty() else ""
                 if (gift.isBlank()) { Toast.makeText(this, "Escolha ou digite o nome do presente.", Toast.LENGTH_SHORT).show(); return@setPositiveButton }
-                if (type in listOf("SUMMON", "GIVE", "EFFECT", "COMMAND") && value.isBlank()) { Toast.makeText(this, "Escolha uma opção.", Toast.LENGTH_SHORT).show(); return@setPositiveButton }
+                if (pendingActions.length() == 0 && type in listOf("SUMMON", "GIVE", "EFFECT", "COMMAND") && value.isBlank()) { Toast.makeText(this, "Escolha uma opção.", Toast.LENGTH_SHORT).show(); return@setPositiveButton }
                 val selectedIcon = GiftRuleStore.iconOptions.getOrElse(icon.selectedItemPosition) { "🎁" }
                 val savedImage = selectedImageUrl.ifBlank { entries.firstOrNull { it.name.equals(gift, true) }?.imageUrl.orEmpty() }
-                val rule = GiftRule(gift, type, value, amount.text.toString().toIntOrNull()?.coerceIn(1, 64) ?: 1, selectedIcon, savedImage)
+                val finalType = if (pendingActions.length() > 0) "MULTI" else type
+                if (pendingActions.length() > 0 && type in listOf("SUMMON", "GIVE", "EFFECT", "COMMAND") && value.isNotBlank()) {
+                    pendingActions.put(org.json.JSONObject().put("type", type).put("value", value).put("amount", amount.text.toString().toIntOrNull()?.coerceIn(1,64) ?: 1))
+                } else if (pendingActions.length() > 0 && type in listOf("KIT_NETHERITE", "CLEAR", "KILL", "HEAL", "FEED", "LIGHTNING", "SOUND")) {
+                    pendingActions.put(org.json.JSONObject().put("type", type).put("value", value).put("amount", amount.text.toString().toIntOrNull()?.coerceIn(1,64) ?: 1))
+                }
+                val finalValue = if (pendingActions.length() > 0) pendingActions.toString() else value
+                val rule = GiftRule(gift, finalType, finalValue, amount.text.toString().toIntOrNull()?.coerceIn(1, 64) ?: 1, selectedIcon, savedImage)
                 var target = old?.let { rules.indexOfFirst { r -> r.giftName.equals(it.giftName, true) } } ?: -1
                 val duplicate = rules.indexOfFirst { it.giftName.equals(gift, true) }
                 if (duplicate >= 0 && duplicate != target) { rules.removeAt(duplicate); if (target > duplicate) target-- }

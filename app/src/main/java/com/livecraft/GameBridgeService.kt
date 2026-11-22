@@ -192,10 +192,11 @@ class GameBridgeService : Service() {
             update("Presente ainda não configurado: " + giftName, "Novo presente detectado: " + giftName + ". Cadastre esse nome no editor.")
             return false
         }
-        val sent = sendCommand(action.command)
+        val sentResults = action.commands.map { sendCommand(it) }
+        val sent = sentResults.all { it }
         update(
-            if (sent) "Presente recebido: ${action.giftName}" else "Presente recebido, mas Minecraft desconectado",
-            "${action.giftName} (${action.diamondTotal} moedas) → ${action.command}"
+            if (sent) "Presente recebido: ${action.giftName}" else "Presente recebido, mas Minecraft desconectado ou houve falha",
+            "${action.giftName} (${action.diamondTotal} moedas) → ${action.commands.joinToString(" | ")}"
         )
         return sent
     }
