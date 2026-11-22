@@ -98,11 +98,10 @@ class GiftRulesActivity : Activity() {
         }
         name.setOnItemClickListener { _, _, position, _ -> selectGift(entries.firstOrNull { it.name.equals(name.text.toString(), true) }?.name ?: name.text.toString()) }
         val chooseGift = button("ABRIR BIBLIOTECA DE PRESENTES") {
-            val names = entries.map { entry -> entry.name + if (entry.coins > 0) "  •  " + entry.coins + " moedas" else "" }.toTypedArray()
-            AlertDialog.Builder(this).setTitle("Escolha um presente").setItems(names) { _, which ->
-                name.setText(entries[which].name)
-                selectGift(entries[which].name)
-            }.show()
+            openGiftLibrary(entries) { entry ->
+                name.setText(entry.name)
+                selectGift(entry.name)
+            }
         }
         val icon = Spinner(this).apply {
             adapter = ArrayAdapter(this@GiftRulesActivity, android.R.layout.simple_spinner_dropdown_item, GiftRuleStore.iconOptions)
@@ -154,6 +153,78 @@ class GiftRulesActivity : Activity() {
                 if (target < 0) rules.add(rule) else rules[target] = rule
                 save()
             }.show()
+    }
+
+    private fun openGiftLibrary(entries: List<GiftCatalogEntry>, onSelect: (GiftCatalogEntry) -> Unit) {
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(10), dp(8), dp(10), dp(8))
+            setBackgroundColor(0xFF1E1E1E.toInt())
+        }
+        val scroll = ScrollView(this)
+        val grid = android.widget.GridLayout(this).apply {
+            columnCount = 4
+            useDefaultMargins = false
+        }
+        entries.forEach { entry ->
+            val tile = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = android.view.Gravity.CENTER
+                setPadding(dp(4), dp(8), dp(4), dp(8))
+                isClickable = true
+                isFocusable = true
+                background = rounded(12, 0xFF292929.toInt(), 0xFF454545.toInt())
+            }
+            val image = ImageView(this).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(58), dp(58))
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                contentDescription = entry.name
+            }
+            if (entry.imageUrl.isNotBlank()) loadGiftImage(entry.imageUrl, image)
+            else image.setImageResource(android.R.drawable.ic_menu_gallery)
+            tile.addView(image)
+            tile.addView(TextView(this).apply {
+                text = entry.name
+                textSize = 11f
+                setTextColor(Color.WHITE)
+                gravity = android.view.Gravity.CENTER
+                maxLines = 2
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                setPadding(0, dp(4), 0, 0)
+            })
+            tile.addView(TextView(this).apply {
+                text = "🪙 " + entry.coins
+                textSize = 10f
+                setTextColor(0xFFFFD54F.toInt())
+                gravity = android.view.Gravity.CENTER
+                setPadding(0, dp(3), 0, 0)
+            })
+            tile.setOnClickListener {
+                onSelect(entry)
+                (tile.parent?.parent as? android.view.View)?.let { }
+            }
+            val params = android.widget.GridLayout.LayoutParams().apply {
+                width = 0
+                height = -2
+                columnSpec = android.widget.GridLayout.spec(android.widget.GridLayout.UNDEFINED, 1f)
+                setMargins(dp(3), dp(3), dp(3), dp(3))
+            }
+            grid.addView(tile, params)
+        }
+        scroll.addView(grid)
+        content.addView(scroll, LinearLayout.LayoutParams(-1, dp(440)))
+        val dialog = AlertDialog.Builder(this).setTitle("Biblioteca de presentes")
+            .setView(content).setNegativeButton("FECHAR", null).create()
+        // Each tile selects the gift and closes the library.
+        for (i in 0 until grid.childCount) {
+            val tile = grid.getChildAt(i)
+            tile.setOnClickListener {
+                onSelect(entries[i])
+                dialog.dismiss()
+            }
+        }
+        dialog.show()
+        dialog.window?.setLayout((resources.displayMetrics.widthPixels * 0.94f).toInt(), -2)
     }
 
     private fun loadGiftImage(url: String, target: ImageView) {
