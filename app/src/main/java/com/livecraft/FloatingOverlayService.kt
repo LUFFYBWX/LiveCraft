@@ -96,11 +96,16 @@ class FloatingOverlayService : Service() {
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
         ).apply { gravity = Gravity.TOP or Gravity.START }
-        val fractionX = prefs().getFloat(KEY_PANEL_X, 0.04f)
-        val fractionY = prefs().getFloat(KEY_PANEL_Y, 0.18f)
+        val fractionX = prefs().getFloat(KEY_PANEL_X, 0.04f).coerceIn(0f, 1f)
+        val fractionY = prefs().getFloat(KEY_PANEL_Y, 0.18f).coerceIn(0f, 1f)
         val metrics = resources.displayMetrics
+        view.measure(
+            View.MeasureSpec.makeMeasureSpec(dp(270), View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(metrics.heightPixels, View.MeasureSpec.AT_MOST)
+        )
+        val panelHeight = view.measuredHeight
         params.x = ((metrics.widthPixels - dp(270)).coerceAtLeast(0) * fractionX).toInt()
-        params.y = ((metrics.heightPixels - dp(180)).coerceAtLeast(0) * fractionY).toInt()
+        params.y = ((metrics.heightPixels - panelHeight).coerceAtLeast(0) * fractionY).toInt()
         return params
     }
 
@@ -188,10 +193,10 @@ class FloatingOverlayService : Service() {
     private fun refreshPanel() {
         if (panel == null) return
         val old = panel!!
-        val params = try { old.layoutParams as WindowManager.LayoutParams } catch (_: Exception) { panelParams(old) }
         try { windowManager.removeView(old) } catch (_: Exception) {}
         panel = null
         val fresh = buildGiftPanel()
+        val params = panelParams(fresh)
         try { windowManager.addView(fresh, params); panel = fresh } catch (_: Exception) {}
     }
 
