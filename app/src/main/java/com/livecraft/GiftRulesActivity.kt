@@ -212,6 +212,7 @@ class GiftRulesActivity : Activity() {
             visibility = View.GONE
             setPadding(0, dp(36), 0, dp(36))
         }
+        lateinit var dialog: AlertDialog
         fun renderGrid(query: String) {
             grid.removeAllViews()
             val filtered = entries.filter { it.name.contains(query.trim(), ignoreCase = true) }
@@ -266,7 +267,7 @@ class GiftRulesActivity : Activity() {
             addView(empty, FrameLayout.LayoutParams(-1, -2, android.view.Gravity.CENTER))
         }
         content.addView(body, LinearLayout.LayoutParams(-1, dp(430)))
-        val dialog = AlertDialog.Builder(this).setView(content)
+        dialog = AlertDialog.Builder(this).setView(content)
             .setNegativeButton("FECHAR", null).create()
         // Grid is rebuilt as the user types; the dialog closes after a selection.
         search.addTextChangedListener(object : android.text.TextWatcher {
