@@ -74,6 +74,52 @@ class MainActivity : Activity() {
         root.addView(tiktokUsername)
         root.addView(space(12))
 
+        root.addView(sectionTitle("EVENTOS DA LIVE"))
+        val prefs = getSharedPreferences("livecraft", MODE_PRIVATE)
+        val chatEvents = Switch(this).apply {
+            text = "Ativar eventos por palavras no chat"
+            setTextColor(Color.WHITE)
+            isChecked = prefs.getBoolean("chat_events_enabled", false)
+            setOnCheckedChangeListener { _, checked ->
+                prefs.edit().putBoolean("chat_events_enabled", checked).apply()
+            }
+        }
+        root.addView(chatEvents)
+        root.addView(label("Palavras: zumbi, creeper, esqueleto e diamante. O evento só dispara quando a mensagem inteira corresponde à palavra.", 12f, 0xFFBBBBBB.toInt()))
+        root.addView(space(8))
+        root.addView(label("Meta de likes para executar uma ação", 13f, Color.WHITE, true))
+        val likesTarget = EditText(this).apply {
+            hint = "Quantidade de likes (padrão: 100)"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            setSingleLine(true)
+            setTextColor(Color.WHITE)
+            setHintTextColor(0xFF888888.toInt())
+            setText(prefs.getInt("likes_target", 100).toString())
+            background = roundedOutline(16, Color.BLACK, Color.WHITE)
+            setPadding(16, 12, 16, 12)
+        }
+        root.addView(likesTarget)
+        val likesAction = Spinner(this).apply {
+            adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item,
+                listOf("Invocar zumbi", "Invocar creeper", "Dar diamante", "Dar maçã dourada", "Invocar raio"))
+            val selected = when (prefs.getString("likes_action", "zombie")) {
+                "creeper" -> 1; "diamond" -> 2; "golden_apple" -> 3; "lightning" -> 4; else -> 0
+            }
+            setSelection(selected)
+        }
+        root.addView(likesAction)
+        root.addView(makeButton("SALVAR EVENTO DE LIKES") {
+            val target = likesTarget.text.toString().toIntOrNull()
+            if (target == null || target !in 1..100000) {
+                generalStatus.text = "Escolha uma meta entre 1 e 100000 likes."
+            } else {
+                val action = listOf("zombie", "creeper", "diamond", "golden_apple", "lightning")[likesAction.selectedItemPosition]
+                prefs.edit().putInt("likes_target", target).putString("likes_action", action).apply()
+                generalStatus.text = "Evento salvo: a cada $target likes."
+            }
+        })
+        root.addView(space(12))
+
         root.addView(sectionTitle("CONTROLES"))
         root.addView(makeButton("CONFIGURAR PAINEL DE PRESENTES") {
             startActivity(Intent(this, PanelPositionActivity::class.java))
