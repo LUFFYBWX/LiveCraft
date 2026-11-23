@@ -19,6 +19,7 @@ import java.net.URL
 class FloatingOverlayService : Service() {
     private lateinit var windowManager: WindowManager
     private var panel: View? = null
+    private var floatingText: View? = null
     private var panelGiftIndex = 0
     private val panelHandler = Handler(Looper.getMainLooper())
     private val rotateGift = object : Runnable {
@@ -59,11 +60,13 @@ class FloatingOverlayService : Service() {
         when (intent?.action) {
             ACTION_PANEL_ON -> { prefs().edit().putBoolean(KEY_PANEL, true).apply(); showPanel() }
             ACTION_PANEL_OFF -> { prefs().edit().putBoolean(KEY_PANEL, false).apply(); removePanel() }
-            ACTION_REFRESH -> { if (panel == null && prefs().getBoolean(KEY_PANEL, false)) showPanel() else refreshPanel() }
-            else -> if (prefs().getBoolean(KEY_PANEL, false)) showPanel()
+            ACTION_TEXT_ON -> { prefs().edit().putBoolean(KEY_TEXT, true).apply(); showFloatingText() }
+            ACTION_TEXT_OFF -> { prefs().edit().putBoolean(KEY_TEXT, false).apply(); removeFloatingText() }
+            ACTION_REFRESH -> { if (prefs().getBoolean(KEY_PANEL, false)) { if (panel == null) showPanel() else refreshPanel() }; if (prefs().getBoolean(KEY_TEXT, false)) { removeFloatingText(); showFloatingText() } }
+            else -> { if (prefs().getBoolean(KEY_PANEL, false)) showPanel(); if (prefs().getBoolean(KEY_TEXT, false)) showFloatingText() }
         }
         if (prefs().getBoolean(KEY_PANEL, false)) startGiftRotation()
-        if (!prefs().getBoolean(KEY_PANEL, false)) {
+        if (!prefs().getBoolean(KEY_PANEL, false) && !prefs().getBoolean(KEY_TEXT, false)) {
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
@@ -156,6 +159,67 @@ class FloatingOverlayService : Service() {
         return outer
     }
 
+    private fun showFloatingText() {
+        if (floatingText != null) return
+        val value = prefs().getString(KEY_TEXT_VALUE, "").orEmpty().trim()
+        if (value.isBlank()) return
+        val size = prefs().getInt(KEY_TEXT_SIZE, 28).coerceIn(14, 72)
+        val view = TextView(this).apply {
+            text = value
+            textSize = size.toFloat()
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            setTextColor(Color.WHITE)
+            setShadowLayer(dp(3).toFloat(), 1f, 1f, Color.BLACK)
+            setPadding(dp(10), dp(6), dp(10), dp(6))
+            background = GradientDrawable().apply {
+                setColor(0x99000000.toInt())
+                cornerRadius = dp(12).toFloat()
+                setStroke(dp(1), Color.WHITE)
+            }
+        }
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT, overlayType(),
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = prefs().getInt(KEY_TEXT_X, dp(40)).coerceAtLeast(0)
+            y = prefs().getInt(KEY_TEXT_Y, dp(120)).coerceAtLeast(0)
+        }
+        view.setOnTouchListener(object : View.OnTouchListener {
+            private var downX = 0f
+            private var downY = 0f
+            private var startX = 0
+            private var startY = 0
+            override fun onTouch(v: View, event: MotionEvent): Boolean {
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        downX = event.rawX; downY = event.rawY
+                        startX = params.x; startY = params.y
+                        return true
+                    }
+                    MotionEvent.ACTION_MOVE -> {
+                        params.x = (startX + event.rawX - downX).toInt().coerceAtLeast(0)
+                        params.y = (startY + event.rawY - downY).toInt().coerceAtLeast(0)
+                        try { windowManager.updateViewLayout(view, params) } catch (_: Exception) {}
+                        return true
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        prefs().edit().putInt(KEY_TEXT_X, params.x).putInt(KEY_TEXT_Y, params.y).apply()
+                        return true
+                    }
+                }
+                return true
+            }
+        })
+        try { windowManager.addView(view, params); floatingText = view } catch (_: Exception) {}
+    }
+
+    private fun removeFloatingText() {
+        floatingText?.let { try { windowManager.removeView(it) } catch (_: Exception) {} }
+        floatingText = null
+    }
+
     private fun startGiftRotation() {
         panelHandler.removeCallbacks(rotateGift)
         if (prefs().getBoolean(KEY_PANEL, false)) panelHandler.postDelayed(rotateGift, 2000L)
@@ -208,6 +272,7 @@ class FloatingOverlayService : Service() {
 
     override fun onDestroy() {
         removePanel()
+        removeFloatingText()
         super.onDestroy()
     }
 
@@ -215,9 +280,16 @@ class FloatingOverlayService : Service() {
         const val ACTION_PANEL_ON = "com.livecraft.overlay.PANEL_ON"
         const val ACTION_PANEL_OFF = "com.livecraft.overlay.PANEL_OFF"
         const val ACTION_REFRESH = "com.livecraft.overlay.REFRESH"
+        const val ACTION_TEXT_ON = "com.livecraft.overlay.TEXT_ON"
+        const val ACTION_TEXT_OFF = "com.livecraft.overlay.TEXT_OFF"
         const val KEY_PANEL = "overlay_panel_enabled"
         const val KEY_PANEL_X = "overlay_panel_x"
         const val KEY_PANEL_Y = "overlay_panel_y"
+        const val KEY_TEXT = "overlay_text_enabled"
+        const val KEY_TEXT_VALUE = "overlay_text_value"
+        const val KEY_TEXT_SIZE = "overlay_text_size"
+        const val KEY_TEXT_X = "overlay_text_x"
+        const val KEY_TEXT_Y = "overlay_text_y"
         const val CHANNEL = "livecraft_overlay"
         const val NOTIFICATION_ID = 42
     }

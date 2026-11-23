@@ -127,6 +127,42 @@ class MainActivity : Activity() {
         root.addView(makeButton("PERSONALIZAR PRESENTES") {
             startActivity(Intent(this, GiftRulesActivity::class.java))
         })
+        root.addView(sectionTitle("TEXTO FLUTUANTE"))
+        val overlayTextInput = EditText(this).apply {
+            hint = "Digite o texto que aparecerá na live"
+            setSingleLine(true)
+            setTextColor(Color.WHITE)
+            setHintTextColor(0xFF888888.toInt())
+            setText(prefs.getString(FloatingOverlayService.KEY_TEXT_VALUE, "").orEmpty())
+            background = roundedOutline(16, Color.BLACK, Color.WHITE)
+            setPadding(16, 12, 16, 12)
+        }
+        root.addView(overlayTextInput)
+        val overlayTextSize = EditText(this).apply {
+            hint = "Tamanho do texto (14 a 72)"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            setSingleLine(true)
+            setTextColor(Color.WHITE)
+            setHintTextColor(0xFF888888.toInt())
+            setText(prefs.getInt(FloatingOverlayService.KEY_TEXT_SIZE, 28).toString())
+            background = roundedOutline(16, Color.BLACK, Color.WHITE)
+            setPadding(16, 12, 16, 12)
+        }
+        root.addView(overlayTextSize)
+        root.addView(makeButton("SALVAR E MOSTRAR TEXTO FLUTUANTE") {
+            val value = overlayTextInput.text.toString().trim()
+            val size = overlayTextSize.text.toString().toIntOrNull()
+            if (value.isBlank() || size == null || size !in 14..72) {
+                generalStatus.text = "Digite um texto e escolha tamanho entre 14 e 72."
+            } else {
+                prefs.edit().putString(FloatingOverlayService.KEY_TEXT_VALUE, value).putInt(FloatingOverlayService.KEY_TEXT_SIZE, size).apply()
+                startOverlayService(FloatingOverlayService.ACTION_TEXT_ON)
+                generalStatus.text = "Texto flutuante ativado. Arraste-o para posicionar."
+            }
+        })
+        root.addView(makeButton("OCULTAR TEXTO FLUTUANTE") {
+            startOverlayService(FloatingOverlayService.ACTION_TEXT_OFF)
+        })
         root.addView(makeButton("SALVAR USUÁRIO") {
             val username = tiktokUsername.text.toString().trim().removePrefix("@").trim()
             if (username.isBlank()) {

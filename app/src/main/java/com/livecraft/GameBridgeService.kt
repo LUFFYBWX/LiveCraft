@@ -203,23 +203,11 @@ class GameBridgeService : Service() {
 
     @Synchronized fun handleTikTokLikes(count: Int) {
         if (count <= 0) return
-        val prefs = getSharedPreferences("livecraft", MODE_PRIVATE)
-        val target = prefs.getInt("likes_target", 100).coerceIn(1, 100000)
-        val command = when (prefs.getString("likes_action", "zombie")) {
-            "creeper" -> "summon creeper ~ ~1 ~"
-            "diamond" -> "give @p diamond 1"
-            "golden_apple" -> "give @p golden_apple 1"
-            "lightning" -> "summon lightning_bolt ~ ~ ~"
-            else -> "summon zombie ~ ~1 ~"
-        }
         pendingLikes += count.toLong()
-        while (pendingLikes >= target) {
-            pendingLikes -= target
-            val sent = sendCommand(command)
-            update(
-                if (sent) "Meta de $target likes atingida!" else "$target likes atingidos, mas Minecraft está desconectado",
-                "$target likes → $command"
-            )
+        while (pendingLikes >= 100) {
+            pendingLikes -= 100
+            val sent = sendCommand("summon zombie ~ ~1 ~")
+            update(if (sent) "Meta de 100 likes atingida: 1 Zumbi!" else "100 likes atingidos, mas Minecraft está desconectado", "100 likes → summon zombie")
         }
     }
 
@@ -227,34 +215,14 @@ class GameBridgeService : Service() {
         val safeUser = username.replace('\r', ' ').replace('\n', ' ').take(32)
         val safeComment = comment.replace('\r', ' ').replace('\n', ' ').take(180)
         if (safeComment.isBlank()) return false
-        val prefs = getSharedPreferences("livecraft", MODE_PRIVATE)
-        var eventCommand: String? = null
-        if (prefs.getBoolean("chat_events_enabled", false)) {
-            val keyword = safeComment.trim().lowercase().replace(Regex("\\s+"), " ")
-            eventCommand = when (keyword) {
-                "zumbi", "zombie" -> "summon zombie ~ ~1 ~"
-                "creeper" -> "summon creeper ~ ~1 ~"
-                "esqueleto", "skeleton" -> "summon skeleton ~ ~1 ~"
-                "diamante" -> "give @p diamond 1"
-                else -> null
-            }
-        }
         val text = "§b[$safeUser] §f$safeComment"
         val raw = JSONObject().put("rawtext", org.json.JSONArray().put(JSONObject().put("text", text)))
-        val chatSent = sendCommand("tellraw @a $raw")
-        val eventSent = eventCommand?.let { sendCommand(it) }
-        if (eventCommand != null) {
-            update(
-                if (eventSent == true) "Evento do chat executado: $safeComment" else "Evento do chat recebido, mas Minecraft desconectado",
-                "$safeUser: $safeComment → $eventCommand"
-            )
-        } else {
-            update(
-                if (chatSent) "Comentário recebido: $safeUser" else "Comentário recebido, mas Minecraft desconectado",
-                "$safeUser: $safeComment"
-            )
-        }
-        return chatSent || eventSent == true
+        val sent = sendCommand("tellraw @a $raw")
+        update(
+            if (sent) "Comentário recebido: $safeUser" else "Comentário recebido, mas Minecraft desconectado",
+            "$safeUser: $safeComment"
+        )
+        return sent
     }
 
     private fun update(status: String, line: String? = null) {
