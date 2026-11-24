@@ -16,6 +16,8 @@ import kotlin.math.min
 class PanelPositionActivity : Activity() {
     private lateinit var stage: FrameLayout
     private lateinit var preview: LinearLayout
+    private lateinit var overlayTextInput: EditText
+    private lateinit var overlaySizeInput: EditText
     private var downX = 0f
     private var downY = 0f
     private var startX = 0f
@@ -69,6 +71,29 @@ class PanelPositionActivity : Activity() {
                 else -> true
             }
         }
+        val prefs = getSharedPreferences("livecraft", MODE_PRIVATE)
+        val textControls = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        overlayTextInput = EditText(this).apply {
+            hint = "Texto flutuante"
+            setSingleLine()
+            setTextColor(Color.WHITE); setHintTextColor(0xFFAAAAAA.toInt())
+            setText(prefs.getString(FloatingOverlayService.KEY_TEXT_VALUE, "").orEmpty())
+        }
+        overlaySizeInput = EditText(this).apply {
+            hint = "Px"; inputType = android.text.InputType.TYPE_CLASS_NUMBER; setSingleLine()
+            setTextColor(Color.WHITE); setHintTextColor(0xFFAAAAAA.toInt())
+            setText(prefs.getInt(FloatingOverlayService.KEY_TEXT_SIZE, 24).toString())
+        }
+        textControls.addView(overlayTextInput, LinearLayout.LayoutParams(0, -2, 3f))
+        textControls.addView(overlaySizeInput, LinearLayout.LayoutParams(0, -2, 1f))
+        root.addView(textControls)
+        val textToggle = makeButton(if (prefs.getBoolean(FloatingOverlayService.KEY_TEXT, false)) "TEXTO: ATIVADO" else "TEXTO: DESATIVADO", 1f) {}
+        textToggle.setOnClickListener {
+            val enabled = !getSharedPreferences("livecraft", MODE_PRIVATE).getBoolean(FloatingOverlayService.KEY_TEXT, false)
+            getSharedPreferences("livecraft", MODE_PRIVATE).edit().putBoolean(FloatingOverlayService.KEY_TEXT, enabled).apply()
+            textToggle.text = if (enabled) "TEXTO: ATIVADO" else "TEXTO: DESATIVADO"
+        }
+        root.addView(textToggle)
         val buttons = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         buttons.addView(makeButton("SALVAR E ATIVAR", 1f) {
             val maxX = (stage.width - preview.width).coerceAtLeast(1)
@@ -76,14 +101,17 @@ class PanelPositionActivity : Activity() {
             getSharedPreferences("livecraft", MODE_PRIVATE).edit()
                 .putFloat(FloatingOverlayService.KEY_PANEL_X, (preview.x / maxX).coerceIn(0f, 1f))
                 .putFloat(FloatingOverlayService.KEY_PANEL_Y, (preview.y / maxY).coerceIn(0f, 1f))
-                .putBoolean(FloatingOverlayService.KEY_PANEL, true).apply()
+                .putBoolean(FloatingOverlayService.KEY_PANEL, true)
+                .putString(FloatingOverlayService.KEY_TEXT_VALUE, overlayTextInput.text.toString().trim())
+                .putInt(FloatingOverlayService.KEY_TEXT_SIZE, (overlaySizeInput.text.toString().toIntOrNull() ?: 24).coerceIn(12, 72))
+                .apply()
             if (startOverlay(FloatingOverlayService.ACTION_PANEL_ON)) {
                 Toast.makeText(this, "Painel ativado. Ele não bloqueia toques.", Toast.LENGTH_SHORT).show()
                 finish()
             }
         })
         buttons.addView(makeButton("DESATIVAR PAINEL", 1f) {
-            getSharedPreferences("livecraft", MODE_PRIVATE).edit().putBoolean(FloatingOverlayService.KEY_PANEL, false).apply()
+            getSharedPreferences("livecraft", MODE_PRIVATE).edit().putBoolean(FloatingOverlayService.KEY_PANEL, false).putBoolean(FloatingOverlayService.KEY_TEXT, false).apply()
             if (android.os.Build.VERSION.SDK_INT < 23 || android.provider.Settings.canDrawOverlays(this)) {
                 startOverlay(FloatingOverlayService.ACTION_PANEL_OFF)
             }
