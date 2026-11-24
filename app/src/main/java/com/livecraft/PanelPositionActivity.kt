@@ -142,14 +142,10 @@ class PanelPositionActivity : Activity() {
             textToggle.text = if (enabled) "TEXTO: ATIVADO" else "TEXTO: DESATIVADO"
         }
         controlsPanel.addView(textToggle)
-        stage.addView(controlsPanel, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.WRAP_CONTENT,
-            Gravity.BOTTOM
-        ).apply {
-            leftMargin = dp(6); rightMargin = dp(6); bottomMargin = dp(6)
-        })
-        controlsPanel.bringToFront()
+        val controlsParams = LinearLayout.LayoutParams(-1, -2).apply {
+            topMargin = dp(2); bottomMargin = dp(6)
+        }
+        root.addView(controlsPanel, controlsParams)
         val buttons = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         buttons.addView(makeButton("SALVAR E ATIVAR", 1f) {
             val maxX = (stage.width - preview.width).coerceAtLeast(1)
