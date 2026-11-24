@@ -31,6 +31,7 @@ pub enum TikTokLiveEvent {
     Connected { room_id: String },
     Reconnecting { attempt: u32, max_retries: u32, delay_secs: u64 },
     Disconnected,
+    Status(String),
 
     // core events
     Chat(WebcastChatMessage),
