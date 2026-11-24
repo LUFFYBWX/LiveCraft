@@ -238,9 +238,9 @@ class GameBridgeService : Service() {
             val mob = MobCatalog.findMob(safeComment)
             if (mob != null) {
                 mobHandler.post {
+                    val startWindow = pendingMob == null
                     pendingMob = mob
-                    mobHandler.removeCallbacks(spawnPendingMob)
-                    mobHandler.postDelayed(spawnPendingMob, MOB_SPAWN_DELAY_MS)
+                    if (startWindow) mobHandler.postDelayed(spawnPendingMob, MOB_SPAWN_DELAY_MS)
                 }
                 update("Modo Mobs: ${mob.replace('_', ' ')} detectado. Aguardando 5 segundos...", "$safeUser comentou um mob: $mob")
             }
