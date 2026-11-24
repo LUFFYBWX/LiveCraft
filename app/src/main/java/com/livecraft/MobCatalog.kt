@@ -50,7 +50,6 @@ object MobCatalog {
         "golfinho" to "dolphin", "dolphin" to "dolphin",
         "burro" to "donkey", "donkey" to "donkey",
         "afogado" to "drowned", "drowned" to "drowned",
-        "guardiao anciao" to "elder_guardian", "elder guardian" to "elder_guardian",
         "enderman" to "enderman", "endermite" to "endermite",
         "evocador" to "evoker", "evoker" to "evoker",
         "raposa" to "fox", "fox" to "fox",
@@ -100,7 +99,9 @@ object MobCatalog {
         "zumbi piglin" to "zombified_piglin",
         "vaca" to "cow",
         "lobo" to "wolf", "wolf" to "wolf",
-        "pinguim" to "penguin"
+        "piglin" to "piglin", "porco piglin" to "piglin",
+        "creaking" to "creaking", "parched" to "parched",
+        "cavalo" to "horse", "lobo" to "wolf"
     )
 
     private val normalizedAliases = aliases
