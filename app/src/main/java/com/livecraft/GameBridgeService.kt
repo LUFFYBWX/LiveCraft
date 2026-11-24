@@ -216,7 +216,7 @@ class GameBridgeService : Service() {
         super.onDestroy()
     }
 
-    fun handleTikTokGift(giftName: String, imageUrl: String, diamondTotal: Long, isCombo: Boolean = false, isStreakOver: Boolean = true): Boolean {
+    fun handleTikTokGift(giftName: String, imageUrl: String, diamondTotal: Long, isCombo: Boolean = false, isStreakOver: Boolean = true, giftCount: Int = 1): Boolean {
         GiftRuleStore.rememberGift(this, giftName, imageUrl)
         val action = GiftRuleEngine(GiftRuleStore.load(this)).handle(
             LiveGiftEvent(giftName = giftName, diamondTotal = diamondTotal, isCombo = isCombo, isStreakOver = isStreakOver)
@@ -224,11 +224,12 @@ class GameBridgeService : Service() {
             update("Presente ainda não configurado: " + giftName, "Novo presente detectado: " + giftName + ". Cadastre esse nome no editor.")
             return false
         }
-        val sentResults = action.commands.map { sendCommand(it) }
+        val repetitions = if (isCombo) giftCount.coerceAtLeast(1) else 1
+        val sentResults = List(repetitions) { action.commands }.flatten().map { sendCommand(it) }
         val sent = sentResults.all { it }
         update(
             if (sent) "Presente recebido: ${action.giftName}" else "Presente recebido, mas Minecraft desconectado ou houve falha",
-            "${action.giftName} (${action.diamondTotal} moedas) → ${action.commands.joinToString(" | ")}"
+            "${action.giftName} x$repetitions (${action.diamondTotal} moedas) → ${action.commands.joinToString(" | ")}"
         )
         return sent
     }
@@ -374,8 +375,8 @@ class GameBridgeService : Service() {
         }
 
         @JvmStatic
-        fun onNativeTikTokGift(giftName: String, imageUrl: String, diamondTotal: Long, isCombo: Boolean, isStreakOver: Boolean) {
-            instance?.handleTikTokGift(giftName, imageUrl, diamondTotal, isCombo, isStreakOver)
+        fun onNativeTikTokGift(giftName: String, imageUrl: String, diamondTotal: Long, isCombo: Boolean, isStreakOver: Boolean, giftCount: Int) {
+            instance?.handleTikTokGift(giftName, imageUrl, diamondTotal, isCombo, isStreakOver, giftCount)
         }
 
         @JvmStatic
