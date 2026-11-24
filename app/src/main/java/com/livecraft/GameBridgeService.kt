@@ -255,7 +255,8 @@ class GameBridgeService : Service() {
             update(if (sent) "Meta de $target likes atingida!" else "Meta de $target likes atingida, mas não foi possível executar a ação.", "$target ❤️ = ${command ?: "ação inválida"}")
         }
         prefs.edit().putLong(KEY_LIKE_GOAL_PROGRESS, pendingLikes).apply()
-        sendBroadcast(Intent(FloatingOverlayService.ACTION_REFRESH).setPackage(packageName))
+        val refreshPanel = Intent(this, FloatingOverlayService::class.java).setAction(FloatingOverlayService.ACTION_REFRESH)
+        if (Build.VERSION.SDK_INT >= 26) startForegroundService(refreshPanel) else startService(refreshPanel)
     }
 
     fun handleTikTokChat(username: String, comment: String): Boolean {
@@ -452,6 +453,7 @@ class GameBridgeService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        pendingLikes = getSharedPreferences("livecraft", MODE_PRIVATE).getLong(KEY_LIKE_GOAL_PROGRESS, 0L).coerceAtLeast(0L)
         instance = this
     }
 }
