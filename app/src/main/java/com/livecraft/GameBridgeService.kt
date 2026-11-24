@@ -4,6 +4,8 @@ import android.app.*
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
+import android.os.Handler
+import android.os.Looper
 import org.java_websocket.server.WebSocketServer
 import org.java_websocket.WebSocket
 import org.java_websocket.handshake.ClientHandshake
@@ -15,6 +17,21 @@ class GameBridgeService : Service() {
     private var server: MinecraftSocketServer? = null
     private var activeTikTokUsername: String? = null
     private var pendingLikes: Long = 0
+    private val mobHandler = Handler(Looper.getMainLooper())
+    @Volatile private var pendingMob: String? = null
+    private val spawnPendingMob = Runnable {
+        val mob = pendingMob
+        pendingMob = null
+        if (mob != null && getSharedPreferences("livecraft", MODE_PRIVATE)
+                .getBoolean(KEY_MOB_MODE_ENABLED, false)) {
+            val sent = sendCommand("summon $mob ~ ~1 ~")
+            update(
+                if (sent) "Modo Mobs: ${mob.replace('_', ' ')} invocado."
+                else "Modo Mobs: não foi possível invocar ${mob.replace('_', ' ')}. Verifique o Minecraft.",
+                "Último mob: $mob → spawn após 5 segundos"
+            )
+        }
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -176,6 +193,8 @@ class GameBridgeService : Service() {
     }
 
     override fun onDestroy() {
+        mobHandler.removeCallbacks(spawnPendingMob)
+        pendingMob = null
         stopTikTokConnector()
         tiktokConnected = false
         try { server?.stop(500) } catch (_: Exception) {}
@@ -215,6 +234,17 @@ class GameBridgeService : Service() {
         val safeUser = username.replace('\r', ' ').replace('\n', ' ').take(32)
         val safeComment = comment.replace('\r', ' ').replace('\n', ' ').take(180)
         if (safeComment.isBlank()) return false
+        if (getSharedPreferences("livecraft", MODE_PRIVATE).getBoolean(KEY_MOB_MODE_ENABLED, false)) {
+            val mob = MobCatalog.findMob(safeComment)
+            if (mob != null) {
+                mobHandler.post {
+                    pendingMob = mob
+                    mobHandler.removeCallbacks(spawnPendingMob)
+                    mobHandler.postDelayed(spawnPendingMob, MOB_SPAWN_DELAY_MS)
+                }
+                update("Modo Mobs: ${mob.replace('_', ' ')} detectado. Aguardando 5 segundos...", "$safeUser comentou um mob: $mob")
+            }
+        }
         val text = "§b[$safeUser] §f$safeComment"
         val raw = JSONObject().put("rawtext", org.json.JSONArray().put(JSONObject().put("text", text)))
         val sent = sendCommand("tellraw @a $raw")
@@ -268,6 +298,8 @@ class GameBridgeService : Service() {
         const val EXTRA_TIKTOK_CONNECTED = "tiktok_connected"
         private const val CHANNEL_ID = "livecraft_service"
         private const val PORT = 8765
+        const val KEY_MOB_MODE_ENABLED = "mob_mode_enabled"
+        private const val MOB_SPAWN_DELAY_MS = 5000L
 
         @Volatile private var currentStatus: String = "Aguardando você iniciar."
         @Volatile private var connected: WebSocket? = null
