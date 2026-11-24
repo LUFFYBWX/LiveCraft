@@ -235,12 +235,27 @@ class GameBridgeService : Service() {
 
     @Synchronized fun handleTikTokLikes(count: Int) {
         if (count <= 0) return
+        val prefs = getSharedPreferences("livecraft", MODE_PRIVATE)
+        val target = prefs.getInt(KEY_LIKE_GOAL_TARGET, DEFAULT_LIKE_GOAL_TARGET).coerceIn(1, 1_000_000)
         pendingLikes += count.toLong()
-        while (pendingLikes >= 100) {
-            pendingLikes -= 100
-            val sent = sendCommand("summon zombie ~ ~1 ~")
-            update(if (sent) "Meta de 100 likes atingida: 1 Zumbi!" else "100 likes atingidos, mas Minecraft está desconectado", "100 likes → summon zombie")
+        prefs.edit().putLong(KEY_LIKE_GOAL_PROGRESS, pendingLikes).apply()
+        while (pendingLikes >= target) {
+            pendingLikes -= target
+            val actionType = prefs.getString(KEY_LIKE_GOAL_ACTION_TYPE, "COMMAND").orEmpty()
+            val actionValue = prefs.getString(KEY_LIKE_GOAL_ACTION_VALUE, "spawn_zombie").orEmpty()
+            val amount = prefs.getInt(KEY_LIKE_GOAL_ACTION_AMOUNT, 1).coerceIn(1, 64)
+            val command = when (actionType) {
+                "SUMMON" -> "summon $actionValue ~ ~1 ~"
+                "GIVE" -> "give @p $actionValue $amount"
+                "EFFECT" -> "effect @p $actionValue 10 $amount true"
+                "CUSTOM" -> actionValue.removePrefix("/")
+                else -> GiftRuleStore.commandForPreset(actionValue)
+            }
+            val sent = !command.isNullOrBlank() && sendCommand(command)
+            update(if (sent) "Meta de $target likes atingida!" else "Meta de $target likes atingida, mas não foi possível executar a ação.", "$target ❤️ = ${command ?: "ação inválida"}")
         }
+        prefs.edit().putLong(KEY_LIKE_GOAL_PROGRESS, pendingLikes).apply()
+        sendBroadcast(Intent(FloatingOverlayService.ACTION_REFRESH).setPackage(packageName))
     }
 
     fun handleTikTokChat(username: String, comment: String): Boolean {
@@ -335,6 +350,12 @@ class GameBridgeService : Service() {
         const val KEY_MOB_MODE_ENABLED = "mob_mode_enabled"
         const val KEY_MOB_DELAY_SECONDS = "mob_delay_seconds"
         const val DEFAULT_MOB_DELAY_SECONDS = 5
+        const val KEY_LIKE_GOAL_TARGET = "like_goal_target"
+        const val DEFAULT_LIKE_GOAL_TARGET = 100
+        const val KEY_LIKE_GOAL_ACTION_TYPE = "like_goal_action_type"
+        const val KEY_LIKE_GOAL_ACTION_VALUE = "like_goal_action_value"
+        const val KEY_LIKE_GOAL_ACTION_AMOUNT = "like_goal_action_amount"
+        const val KEY_LIKE_GOAL_PROGRESS = "like_goal_progress"
 
         @Volatile private var currentStatus: String = "Aguardando você iniciar."
         @Volatile private var connected: WebSocket? = null
