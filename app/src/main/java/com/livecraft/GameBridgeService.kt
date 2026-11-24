@@ -255,7 +255,7 @@ class GameBridgeService : Service() {
                 mobHandler.post {
                     val startWindow = pendingMob == null
                     pendingMob = mob
-                    if (startWindow) mobHandler.postDelayed(spawnPendingMob, MOB_SPAWN_DELAY_MS)
+                    if (startWindow) {\n                        val delaySeconds = getSharedPreferences("livecraft", MODE_PRIVATE)\n                            .getInt(KEY_MOB_DELAY_SECONDS, DEFAULT_MOB_DELAY_SECONDS).coerceIn(1, 60)\n                        mobHandler.postDelayed(spawnPendingMob, delaySeconds * 1000L)\n                    }
                 }
             }
         }
@@ -263,7 +263,7 @@ class GameBridgeService : Service() {
         val raw = JSONObject().put("rawtext", org.json.JSONArray().put(JSONObject().put("text", text)))
         val sent = sendCommand("tellraw @a $raw")
         update(
-            if (detectedMob != null) "Modo Mobs: ${detectedMob.replace('_', ' ')} detectado. Aguardando o intervalo de 5 segundos..."
+            if (detectedMob != null) "Modo Mobs: ${detectedMob.replace('_', ' ')} detectado. Aguardando o delay configurado..."
             else if (sent) "Comentário recebido: $safeUser" else "Comentário recebido, mas Minecraft desconectado",
             if (detectedMob != null) "$safeUser: $safeComment → mob: $detectedMob" else "$safeUser: $safeComment"
         )
@@ -329,7 +329,7 @@ class GameBridgeService : Service() {
         private const val CHANNEL_ID = "livecraft_service"
         private const val PORT = 8765
         const val KEY_MOB_MODE_ENABLED = "mob_mode_enabled"
-        private const val MOB_SPAWN_DELAY_MS = 5000L
+        private const val KEY_MOB_DELAY_SECONDS = "mob_delay_seconds"\n        const val DEFAULT_MOB_DELAY_SECONDS = 5
 
         @Volatile private var currentStatus: String = "Aguardando você iniciar."
         @Volatile private var connected: WebSocket? = null
