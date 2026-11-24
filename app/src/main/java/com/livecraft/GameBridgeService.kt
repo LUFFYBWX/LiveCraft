@@ -329,7 +329,7 @@ class GameBridgeService : Service() {
         private const val CHANNEL_ID = "livecraft_service"
         private const val PORT = 8765
         const val KEY_MOB_MODE_ENABLED = "mob_mode_enabled"
-        private const val KEY_MOB_DELAY_SECONDS = "mob_delay_seconds"\n        const val DEFAULT_MOB_DELAY_SECONDS = 5
+        const val KEY_MOB_DELAY_SECONDS = "mob_delay_seconds"\n        const val DEFAULT_MOB_DELAY_SECONDS = 5
 
         @Volatile private var currentStatus: String = "Aguardando você iniciar."
         @Volatile private var connected: WebSocket? = null
