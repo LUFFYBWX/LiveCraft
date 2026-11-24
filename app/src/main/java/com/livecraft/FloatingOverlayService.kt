@@ -19,6 +19,7 @@ import java.net.URL
 class FloatingOverlayService : Service() {
     private lateinit var windowManager: WindowManager
     private var panel: View? = null
+    private var floatingText: View? = null
     private var panelGiftIndex = 0
     private val panelHandler = Handler(Looper.getMainLooper())
     private val rotateGift = object : Runnable {
@@ -57,12 +58,14 @@ class FloatingOverlayService : Service() {
             return START_NOT_STICKY
         }
         when (intent?.action) {
-            ACTION_PANEL_ON -> { prefs().edit().putBoolean(KEY_PANEL, true).apply(); showPanel() }
-            ACTION_PANEL_OFF -> { prefs().edit().putBoolean(KEY_PANEL, false).apply(); removePanel() }
-            ACTION_REFRESH -> { if (panel == null && prefs().getBoolean(KEY_PANEL, false)) showPanel() else refreshPanel() }
+            ACTION_PANEL_ON -> { prefs().edit().putBoolean(KEY_PANEL, true).apply(); showPanel(); showFloatingText() }
+            ACTION_PANEL_OFF -> { prefs().edit().putBoolean(KEY_PANEL, false).putBoolean(KEY_TEXT, false).apply(); removePanel(); removeFloatingText() }
+            ACTION_REFRESH -> { if (panel == null && prefs().getBoolean(KEY_PANEL, false)) showPanel() else refreshPanel(); if (prefs().getBoolean(KEY_TEXT, false)) showFloatingText() else removeFloatingText() }
             else -> if (prefs().getBoolean(KEY_PANEL, false)) showPanel()
         }
         if (prefs().getBoolean(KEY_PANEL, false)) startGiftRotation()
+        if (prefs().getBoolean(KEY_PANEL, false) && prefs().getBoolean(KEY_TEXT, false)) showFloatingText()
+        if (!prefs().getBoolean(KEY_PANEL, false)) removeFloatingText()
         if (!prefs().getBoolean(KEY_PANEL, false)) {
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
@@ -156,6 +159,33 @@ class FloatingOverlayService : Service() {
         return outer
     }
 
+    private fun showFloatingText() {
+        removeFloatingText()
+        val value = prefs().getString(KEY_TEXT_VALUE, "").orEmpty().trim()
+        if (value.isBlank()) return
+        val size = prefs().getInt(KEY_TEXT_SIZE, 24).coerceIn(12, 72)
+        val view = TextView(this).apply {
+            text = value; textSize = size.toFloat(); typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.WHITE); setShadowLayer(dp(3).toFloat(), 1f, 1f, Color.BLACK)
+            setPadding(dp(10), dp(6), dp(10), dp(6))
+            background = GradientDrawable().apply { setColor(0x99000000.toInt()); cornerRadius = dp(12).toFloat(); setStroke(dp(1), Color.WHITE) }
+        }
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT, overlayType(),
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = dp(12); y = dp(12)
+        }
+        try { windowManager.addView(view, params); floatingText = view } catch (_: Exception) {}
+    }
+
+    private fun removeFloatingText() {
+        floatingText?.let { try { windowManager.removeView(it) } catch (_: Exception) {} }
+        floatingText = null
+    }
+
     private fun startGiftRotation() {
         panelHandler.removeCallbacks(rotateGift)
         if (prefs().getBoolean(KEY_PANEL, false)) panelHandler.postDelayed(rotateGift, 2000L)
@@ -208,6 +238,7 @@ class FloatingOverlayService : Service() {
 
     override fun onDestroy() {
         removePanel()
+        removeFloatingText()
         super.onDestroy()
     }
 
@@ -218,6 +249,9 @@ class FloatingOverlayService : Service() {
         const val KEY_PANEL = "overlay_panel_enabled"
         const val KEY_PANEL_X = "overlay_panel_x"
         const val KEY_PANEL_Y = "overlay_panel_y"
+        const val KEY_TEXT = "overlay_text_enabled"
+        const val KEY_TEXT_VALUE = "overlay_text_value"
+        const val KEY_TEXT_SIZE = "overlay_text_size"
         const val CHANNEL = "livecraft_overlay"
         const val NOTIFICATION_ID = 42
     }
