@@ -170,13 +170,17 @@ class FloatingOverlayService : Service() {
             setPadding(dp(10), dp(6), dp(10), dp(6))
             background = GradientDrawable().apply { setColor(0x99000000.toInt()); cornerRadius = dp(12).toFloat(); setStroke(dp(1), Color.WHITE) }
         }
+        view.measure(View.MeasureSpec.makeMeasureSpec(resources.displayMetrics.widthPixels, View.MeasureSpec.AT_MOST), View.MeasureSpec.makeMeasureSpec(resources.displayMetrics.heightPixels, View.MeasureSpec.AT_MOST))
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT, overlayType(),
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = dp(12); y = dp(12)
+            val fx = prefs().getFloat(KEY_TEXT_X, .04f).coerceIn(0f, 1f)
+            val fy = prefs().getFloat(KEY_TEXT_Y, .04f).coerceIn(0f, 1f)
+            x = ((resources.displayMetrics.widthPixels - view.measuredWidth).coerceAtLeast(0) * fx).toInt()
+            y = ((resources.displayMetrics.heightPixels - view.measuredHeight).coerceAtLeast(0) * fy).toInt()
         }
         try { windowManager.addView(view, params); floatingText = view } catch (_: Exception) {}
     }
@@ -252,6 +256,8 @@ class FloatingOverlayService : Service() {
         const val KEY_TEXT = "overlay_text_enabled"
         const val KEY_TEXT_VALUE = "overlay_text_value"
         const val KEY_TEXT_SIZE = "overlay_text_size"
+        const val KEY_TEXT_X = "overlay_text_x"
+        const val KEY_TEXT_Y = "overlay_text_y"
         const val CHANNEL = "livecraft_overlay"
         const val NOTIFICATION_ID = 42
     }
