@@ -30,7 +30,7 @@ class MobCatalogTest {
     }
 
     @Test fun recognizesRegularHostileAndPassiveMobs() {
-        assertEquals("ender_man", MobCatalog.findMob("enderman"))
+        assertEquals("enderman", MobCatalog.findMob("enderman"))
         assertEquals("sheep", MobCatalog.findMob("ovelha"))
         assertEquals("happy_ghast", MobCatalog.findMob("happy ghast"))
     }
