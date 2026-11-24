@@ -18,6 +18,11 @@ class PanelPositionActivity : Activity() {
     private lateinit var preview: LinearLayout
     private lateinit var overlayTextInput: EditText
     private lateinit var overlaySizeInput: EditText
+    private lateinit var floatingTextPreview: TextView
+    private var textDownX = 0f
+    private var textDownY = 0f
+    private var textStartX = 0f
+    private var textStartY = 0f
     private var downX = 0f
     private var downY = 0f
     private var startX = 0f
@@ -49,6 +54,31 @@ class PanelPositionActivity : Activity() {
         preview = buildPreview()
         val previewParams = FrameLayout.LayoutParams(dp(270), dp(210), Gravity.TOP or Gravity.START)
         stage.addView(preview, previewParams)
+        floatingTextPreview = TextView(this).apply {
+            text = prefs.getString(FloatingOverlayService.KEY_TEXT_VALUE, "").orEmpty().ifBlank { "Texto flutuante" }
+            textSize = prefs.getInt(FloatingOverlayService.KEY_TEXT_SIZE, 24).toFloat()
+            typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.WHITE)
+            setPadding(dp(10), dp(6), dp(10), dp(6))
+            background = GradientDrawable().apply { setColor(0x99000000.toInt()); cornerRadius = dp(12).toFloat(); setStroke(dp(1), Color.WHITE) }
+        }
+        stage.addView(floatingTextPreview, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.START))
+        floatingTextPreview.post {
+            val fx = prefs.getFloat(FloatingOverlayService.KEY_TEXT_X, .04f)
+            val fy = prefs.getFloat(FloatingOverlayService.KEY_TEXT_Y, .04f)
+            floatingTextPreview.x = (stage.width - floatingTextPreview.width).coerceAtLeast(0) * fx
+            floatingTextPreview.y = (stage.height - floatingTextPreview.height).coerceAtLeast(0) * fy
+        }
+        floatingTextPreview.setOnTouchListener { _, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> { textDownX = event.rawX; textDownY = event.rawY; textStartX = floatingTextPreview.x; textStartY = floatingTextPreview.y; true }
+                MotionEvent.ACTION_MOVE -> {
+                    floatingTextPreview.x = (textStartX + event.rawX - textDownX).coerceIn(0f, (stage.width - floatingTextPreview.width).coerceAtLeast(0).toFloat())
+                    floatingTextPreview.y = (textStartY + event.rawY - textDownY).coerceIn(0f, (stage.height - floatingTextPreview.height).coerceAtLeast(0).toFloat())
+                    true
+                }
+                else -> true
+            }
+        }
         preview.post {
             val prefs = getSharedPreferences("livecraft", MODE_PRIVATE)
             val x = prefs.getFloat(FloatingOverlayService.KEY_PANEL_X, .04f)
@@ -87,6 +117,16 @@ class PanelPositionActivity : Activity() {
         textControls.addView(overlayTextInput, LinearLayout.LayoutParams(0, -2, 3f))
         textControls.addView(overlaySizeInput, LinearLayout.LayoutParams(0, -2, 1f))
         root.addView(textControls)
+        overlayTextInput.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { floatingTextPreview.text = s?.toString().orEmpty().ifBlank { "Texto flutuante" } }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
+        overlaySizeInput.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { floatingTextPreview.textSize = (s?.toString()?.toIntOrNull() ?: 24).coerceIn(12, 72).toFloat() }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
         val textToggle = makeButton(if (prefs.getBoolean(FloatingOverlayService.KEY_TEXT, false)) "TEXTO: ATIVADO" else "TEXTO: DESATIVADO", 1f) {}
         textToggle.setOnClickListener {
             val enabled = !getSharedPreferences("livecraft", MODE_PRIVATE).getBoolean(FloatingOverlayService.KEY_TEXT, false)
@@ -104,6 +144,8 @@ class PanelPositionActivity : Activity() {
                 .putBoolean(FloatingOverlayService.KEY_PANEL, true)
                 .putString(FloatingOverlayService.KEY_TEXT_VALUE, overlayTextInput.text.toString().trim())
                 .putInt(FloatingOverlayService.KEY_TEXT_SIZE, (overlaySizeInput.text.toString().toIntOrNull() ?: 24).coerceIn(12, 72))
+                .putFloat(FloatingOverlayService.KEY_TEXT_X, (floatingTextPreview.x / (stage.width - floatingTextPreview.width).coerceAtLeast(1)).coerceIn(0f, 1f))
+                .putFloat(FloatingOverlayService.KEY_TEXT_Y, (floatingTextPreview.y / (stage.height - floatingTextPreview.height).coerceAtLeast(1)).coerceIn(0f, 1f))
                 .apply()
             if (startOverlay(FloatingOverlayService.ACTION_PANEL_ON)) {
                 Toast.makeText(this, "Painel ativado. Ele não bloqueia toques.", Toast.LENGTH_SHORT).show()
