@@ -24,7 +24,7 @@ class FloatingOverlayService : Service() {
     private val panelHandler = Handler(Looper.getMainLooper())
     private val rotateGift = object : Runnable {
         override fun run() {
-            val count = GiftRuleStore.load(this@FloatingOverlayService).size
+            val count = GiftRuleStore.load(this@FloatingOverlayService).size + if (prefs().getBoolean(KEY_LIKE_GOAL_ENABLED, true)) 1 else 0
             if (prefs().getBoolean(KEY_PANEL, false) && count > 1) {
                 panelGiftIndex = (panelGiftIndex + 1) % count
                 refreshPanel()
@@ -114,6 +114,8 @@ class FloatingOverlayService : Service() {
 
     private fun buildGiftPanel(): View {
         val rules = GiftRuleStore.load(this)
+        val showLikeGoal = prefs().getBoolean(KEY_LIKE_GOAL_ENABLED, true)
+        val totalEntries = rules.size + if (showLikeGoal) 1 else 0
         val outer = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -124,12 +126,38 @@ class FloatingOverlayService : Service() {
                 setStroke(dp(1), Color.WHITE)
             }
         }
-        if (rules.isEmpty()) {
+        if (totalEntries == 0) {
             outer.addView(panelText("Nenhum presente configurado", 12f, 0xFFBBBBBB.toInt()))
             return outer
         }
-        panelGiftIndex = panelGiftIndex.coerceIn(0, rules.lastIndex)
-        val rule = rules[panelGiftIndex]
+        panelGiftIndex = panelGiftIndex.coerceIn(0, totalEntries - 1)
+        if (showLikeGoal && panelGiftIndex == rules.size) {
+            val target = prefs().getInt(GameBridgeService.KEY_LIKE_GOAL_TARGET, GameBridgeService.DEFAULT_LIKE_GOAL_TARGET).coerceIn(1, 1_000_000)
+            val progress = prefs().getLong(GameBridgeService.KEY_LIKE_GOAL_PROGRESS, 0L).coerceAtLeast(0L) % target
+            val actionType = prefs().getString(GameBridgeService.KEY_LIKE_GOAL_ACTION_TYPE, "COMMAND").orEmpty()
+            val actionValue = prefs().getString(GameBridgeService.KEY_LIKE_GOAL_ACTION_VALUE, "spawn_zombie").orEmpty()
+            val actionName = when (actionType) {
+                "SUMMON" -> GiftRuleStore.mobs.firstOrNull { it.second == actionValue }?.first ?: actionValue
+                "GIVE" -> GiftRuleStore.items.firstOrNull { it.second == actionValue }?.first ?: actionValue
+                "EFFECT" -> GiftRuleStore.effects.firstOrNull { it.second == actionValue }?.first ?: actionValue
+                "CUSTOM" -> "Comando personalizado"
+                else -> GiftRuleStore.commands.firstOrNull { it.second == actionValue }?.first ?: actionValue
+            }
+            outer.addView(TextView(this).apply {
+                text = "❤️"; textSize = 30f; gravity = Gravity.CENTER
+                layoutParams = LinearLayout.LayoutParams(dp(42), dp(42))
+            })
+            val texts = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(9), 0, 0, 0) }
+            texts.addView(panelText("Meta: $progress / $target likes", 13f, Color.WHITE, true))
+            texts.addView(panelText("$target ❤️ = $actionName", 11f, 0xFFCCCCCC.toInt()))
+            outer.addView(texts, LinearLayout.LayoutParams(0, -2, 1f))
+            return outer
+        }
+        if (rules.isEmpty()) {
+            outer.addView(panelText("Meta de likes configurada", 12f, 0xFFBBBBBB.toInt()))
+            return outer
+        }
+        val rule = rules[panelGiftIndex.coerceAtMost(rules.lastIndex)]
         val entry = GiftRuleStore.giftCatalog(this).firstOrNull { it.name.equals(rule.giftName, true) }
         val imageUrl = rule.imageUrl.ifBlank { entry?.imageUrl.orEmpty() }
         if (imageUrl.isNotBlank()) {
@@ -251,6 +279,7 @@ class FloatingOverlayService : Service() {
         const val ACTION_PANEL_OFF = "com.livecraft.overlay.PANEL_OFF"
         const val ACTION_REFRESH = "com.livecraft.overlay.REFRESH"
         const val KEY_PANEL = "overlay_panel_enabled"
+        const val KEY_LIKE_GOAL_ENABLED = "like_goal_enabled"
         const val KEY_PANEL_X = "overlay_panel_x"
         const val KEY_PANEL_Y = "overlay_panel_y"
         const val KEY_TEXT = "overlay_text_enabled"
