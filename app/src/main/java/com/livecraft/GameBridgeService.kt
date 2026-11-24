@@ -12,6 +12,7 @@ import org.java_websocket.handshake.ClientHandshake
 import org.json.JSONObject
 import java.net.InetSocketAddress
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 class GameBridgeService : Service() {
     private var server: MinecraftSocketServer? = null
@@ -24,12 +25,24 @@ class GameBridgeService : Service() {
         pendingMob = null
         if (mob != null && getSharedPreferences("livecraft", MODE_PRIVATE)
                 .getBoolean(KEY_MOB_MODE_ENABLED, false)) {
-            val sent = sendCommand("summon $mob ~ ~1 ~")
-            update(
-                if (sent) "Modo Mobs: ${mob.replace('_', ' ')} invocado."
-                else "Modo Mobs: não foi possível invocar ${mob.replace('_', ' ')}. Verifique o Minecraft.",
-                "Último mob: $mob → spawn após 5 segundos"
-            )
+            val sent = sendCommand("summon $mob ~ ~1 ~") { response ->
+                val statusCode = response.optInt("statusCode", Int.MIN_VALUE)
+                val output = response.optString("commandOutputMessage")
+                    .ifBlank { response.optString("statusMessage") }
+                    .ifBlank { "Minecraft respondeu sem mensagem de detalhe." }
+                val success = statusCode == 0
+                update(
+                    if (success) "Modo Mobs: Minecraft confirmou o summon de ${mob.replace('_', ' ')}."
+                    else "Modo Mobs: Minecraft rejeitou o summon de ${mob.replace('_', ' ')}.",
+                    "Comando: summon $mob | statusCode=$statusCode | $output"
+                )
+            }
+            if (!sent) {
+                update(
+                    "Modo Mobs: não foi possível enviar o summon de ${mob.replace('_', ' ')}.",
+                    "Minecraft desconectado ou falha ao enviar o comando."
+                )
+            }
         }
     }
 
@@ -275,7 +288,22 @@ class GameBridgeService : Service() {
             update("Minecraft conectado!", "Minecraft conectou ao LiveCraft.")
         }
         override fun onMessage(conn: WebSocket, message: String) {
-            update("Minecraft conectado!", "Resposta do Minecraft: ${message.take(180)}")
+            val handled = try {
+                val packet = JSONObject(message)
+                val header = packet.optJSONObject("header")
+                if (header?.optString("messagePurpose") == "commandResponse") {
+                    val requestId = header.optString("requestId")
+                    val body = packet.optJSONObject("body") ?: JSONObject()
+                    val callback = pendingCommandResponses.remove(requestId)
+                    callback?.invoke(body)
+                    callback != null
+                } else false
+            } catch (_: Exception) {
+                false
+            }
+            if (!handled) {
+                update("Minecraft conectado!", "Resposta do Minecraft: ${message.take(180)}")
+            }
         }
         override fun onClose(conn: WebSocket, code: Int, reason: String, remote: Boolean) {
             if (connected === conn) connected = null
@@ -307,6 +335,7 @@ class GameBridgeService : Service() {
         @Volatile private var connected: WebSocket? = null
         @Volatile private var instance: GameBridgeService? = null
         @Volatile private var tiktokConnected: Boolean = false
+        private val pendingCommandResponses = ConcurrentHashMap<String, (JSONObject) -> Unit>()
 
         fun publishCurrentState(context: android.content.Context) {
             context.sendBroadcast(
@@ -357,13 +386,14 @@ class GameBridgeService : Service() {
             return sendCommand("tellraw @a $raw")
         }
 
-        fun sendCommand(command: String): Boolean {
+        fun sendCommand(command: String, onResponse: ((JSONObject) -> Unit)? = null): Boolean {
             val socket = connected ?: return false
             if (!socket.isOpen) return false
+            val requestId = UUID.randomUUID().toString()
             val packet = JSONObject().apply {
                 put("header", JSONObject().apply {
                     put("version", 1)
-                    put("requestId", UUID.randomUUID().toString())
+                    put("requestId", requestId)
                     put("messageType", "commandRequest")
                     put("messagePurpose", "commandRequest")
                 })
@@ -373,7 +403,24 @@ class GameBridgeService : Service() {
                     put("origin", JSONObject().put("type", "player"))
                 })
             }
-            return try { socket.send(packet.toString()); true } catch (_: Exception) { false }
+            return try {
+                if (onResponse != null) {
+                    pendingCommandResponses[requestId] = onResponse
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        if (pendingCommandResponses.remove(requestId) != null) {
+                            instance?.update(
+                                "Minecraft não respondeu ao comando de summon.",
+                                "Comando enviado: $command | Nenhuma resposta recebida em 5 segundos."
+                            )
+                        }
+                    }, 5000L)
+                }
+                socket.send(packet.toString())
+                true
+            } catch (_: Exception) {
+                pendingCommandResponses.remove(requestId)
+                false
+            }
         }
     }
 
