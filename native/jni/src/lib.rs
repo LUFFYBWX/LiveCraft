@@ -47,13 +47,13 @@ fn likes(vm: &JavaVM, class: &GlobalRef, count: i32) {
     }
 }
 
-fn gift(vm: &JavaVM, class: &GlobalRef, name: &str, image_url: &str, coins: i64, combo: bool, streak_over: bool) {
+fn gift(vm: &JavaVM, class: &GlobalRef, name: &str, image_url: &str, coins: i64, combo: bool, streak_over: bool, gift_count: i32) {
     if let Ok(mut env) = vm.attach_current_thread() {
         if let (Ok(value), Ok(image)) = (env.new_string(name), env.new_string(image_url)) {
             let class = <&JClass>::from(class.as_obj());
-            let _ = env.call_static_method(class, "onNativeTikTokGift", "(Ljava/lang/String;Ljava/lang/String;JZZ)V", &[
+            let _ = env.call_static_method(class, "onNativeTikTokGift", "(Ljava/lang/String;Ljava/lang/String;JZZI)V", &[
                 JValue::Object(&value), JValue::Object(&image), JValue::Long(coins),
-                JValue::Bool(combo as jboolean), JValue::Bool(streak_over as jboolean),
+                JValue::Bool(combo as jboolean), JValue::Bool(streak_over as jboolean), JValue::Int(gift_count),
             ]);
         }
     }
@@ -115,7 +115,7 @@ pub extern "system" fn Java_com_livecraft_TikTokNative_nativeStart(mut env: JNIE
                                                     .and_then(|image| image.url_list.first())
                                                     .map(String::as_str)
                                                     .unwrap_or("");
-                                                gift(&vm, &thread_class, name, image_url, event.diamond_total(), event.is_combo_gift(), event.is_streak_over());
+                                                gift(&vm, &thread_class, name, image_url, event.diamond_total(), event.is_combo_gift(), event.is_streak_over(), if event.is_combo_gift() { event.repeat_count.max(1) } else { 1 });
                                             }
                                             Ok(TikTokLiveEvent::Like(event)) => {
                                                 likes(&vm, &thread_class, event.like_count);
