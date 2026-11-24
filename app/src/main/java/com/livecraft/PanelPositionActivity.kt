@@ -116,7 +116,15 @@ class PanelPositionActivity : Activity() {
         }
         textControls.addView(overlayTextInput, LinearLayout.LayoutParams(0, -2, 3f))
         textControls.addView(overlaySizeInput, LinearLayout.LayoutParams(0, -2, 1f))
-        root.addView(textControls)
+        val controlsPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(8), dp(4), dp(8), dp(4))
+            background = GradientDrawable().apply {
+                setColor(0xCC000000.toInt()); cornerRadius = dp(10).toFloat()
+                setStroke(dp(1), 0xFF777777.toInt())
+            }
+        }
+        controlsPanel.addView(textControls)
         overlayTextInput.addTextChangedListener(object : android.text.TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { floatingTextPreview.text = s?.toString().orEmpty().ifBlank { "Texto flutuante" } }
@@ -133,7 +141,15 @@ class PanelPositionActivity : Activity() {
             getSharedPreferences("livecraft", MODE_PRIVATE).edit().putBoolean(FloatingOverlayService.KEY_TEXT, enabled).apply()
             textToggle.text = if (enabled) "TEXTO: ATIVADO" else "TEXTO: DESATIVADO"
         }
-        root.addView(textToggle)
+        controlsPanel.addView(textToggle)
+        stage.addView(controlsPanel, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+            Gravity.BOTTOM
+        ).apply {
+            leftMargin = dp(6); rightMargin = dp(6); bottomMargin = dp(6)
+        })
+        controlsPanel.bringToFront()
         val buttons = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         buttons.addView(makeButton("SALVAR E ATIVAR", 1f) {
             val maxX = (stage.width - preview.width).coerceAtLeast(1)
