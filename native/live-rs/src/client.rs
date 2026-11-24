@@ -170,6 +170,7 @@ async fn run_attempt(config: &TikTokLiveConfig, room_id: &str, tz: &str, credent
     let session = match ensure_session(config, credentials).await {
         Ok(session) => session,
         Err(e) => {
+            let _ = tx.send(TikTokLiveEvent::Status(format!("Falha ao obter cookie ttwid: {e}"))).await;
             tracing::warn!(error = %e, "ttwid acquisition failed");
             return Attempt {
                 end: judge(SessionExit::NoTtwid, Duration::ZERO).end,
@@ -178,6 +179,7 @@ async fn run_attempt(config: &TikTokLiveConfig, room_id: &str, tz: &str, credent
         }
     };
 
+    let _ = tx.send(TikTokLiveEvent::Status("Cookie ttwid obtido. Preparando handshake WebSocket...".into())).await;
     let started = Instant::now();
     let ws_url = build_ws_url(room_id, tz, config);
     let cookie = config.ws_cookie(&session.ttwid);
@@ -202,6 +204,7 @@ async fn run_attempt(config: &TikTokLiveConfig, room_id: &str, tz: &str, credent
             SessionExit::DeviceBlocked
         }
         Err(e) => {
+            let _ = tx.send(TikTokLiveEvent::Status(format!("Falha no WebSocket: {e}"))).await;
             tracing::error!(error = %e, lived_secs = lived.as_secs(), "websocket error");
             SessionExit::Errored
         }

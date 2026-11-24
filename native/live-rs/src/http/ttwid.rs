@@ -1,6 +1,9 @@
+use std::sync::Arc;
 use std::time::Duration;
 
+use reqwest::cookie::{CookieStore, Jar};
 use reqwest::header::HeaderMap;
+use reqwest::Url;
 
 use crate::errors::TikTokLiveError;
 
@@ -15,45 +18,92 @@ pub struct TtwidRequest<'a> {
 }
 
 pub async fn fetch_ttwid(request: &TtwidRequest<'_>) -> Result<String, TikTokLiveError> {
-    let client = build_client(request)?;
+    let cookie_jar = Arc::new(Jar::default());
+    let client = build_client(request, cookie_jar.clone())?;
+    let cookie_url = Url::parse(request.url).map_err(TikTokLiveError::invalid)?;
     let mut attempt: u32 = 0;
+
     loop {
         attempt += 1;
         let resp = client.get(request.url).send().await?;
         let status = resp.status();
-        let Some(ttwid) = find_ttwid(resp.headers())? else {
-            if attempt >= request.attempts {
-                return Err(TikTokLiveError::ttwid(format!("no ttwid cookie after {attempt} attempts (last http {status})")));
+        let final_url = resp.url().host_str().unwrap_or("unknown").to_string();
+        let content_type = resp.headers().get(reqwest::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok()).unwrap_or("missing").to_string();
+        let set_cookie_names = cookie_names(resp.headers());
+        if let Some(ttwid) = find_ttwid(resp.headers())? {
+            return Ok(ttwid);
+        }
+
+        // TikTok may set ttwid on an intermediate redirect. reqwest's cookie
+        // jar stores cookies from every response in the redirect chain.
+        if let Some(cookie) = cookie_jar.cookies(&cookie_url) {
+            if let Ok(value) = cookie.to_str() {
+                if let Some(ttwid) = find_ttwid_cookie_header(value) {
+                    return Ok(ttwid);
+                }
             }
-            tracing::warn!(attempt, %status, "no ttwid cookie in response, retrying");
-            tokio::time::sleep(request.retry_delay).await;
-            continue;
-        };
-        return Ok(ttwid);
+        }
+
+        if attempt >= request.attempts {
+            let jar_cookie_names = cookie_jar.cookies(&cookie_url)
+                .and_then(|v| v.to_str().ok().map(cookie_names_from_header))
+                .unwrap_or_else(|| "none".to_string());
+            return Err(TikTokLiveError::ttwid(format!(
+                "no ttwid after {attempt} attempts; http={status}; final_host={final_url}; content_type={content_type}; set_cookie_names={set_cookie_names}; jar_cookie_names={jar_cookie_names}"
+            )));
+        }
+        tracing::warn!(attempt, %status, "no ttwid cookie in response or cookie jar, retrying");
+        tokio::time::sleep(request.retry_delay).await;
     }
 }
 
-fn build_client(request: &TtwidRequest<'_>) -> Result<reqwest::Client, TikTokLiveError> {
-    let mut builder = reqwest::Client::builder().timeout(request.timeout).user_agent(request.user_agent).redirect(reqwest::redirect::Policy::none());
+fn build_client(request: &TtwidRequest<'_>, jar: Arc<Jar>) -> Result<reqwest::Client, TikTokLiveError> {
+    let mut builder = reqwest::Client::builder()
+        .timeout(request.timeout)
+        .user_agent(request.user_agent)
+        .cookie_provider(jar)
+        .redirect(reqwest::redirect::Policy::limited(10));
     for proxy in request.proxy.iter() {
         builder = builder.proxy(reqwest::Proxy::all(*proxy)?);
     }
     Ok(builder.build()?)
 }
 
+
 fn find_ttwid(headers: &HeaderMap) -> Result<Option<String>, TikTokLiveError> {
     for header in headers.get_all("set-cookie") {
         let value = header.to_str().map_err(|e| TikTokLiveError::invalid(format!("set-cookie header: {e}")))?;
-        let Some(rest) = value.strip_prefix("ttwid=") else {
-            continue;
-        };
-        let Some(token) = rest.split(';').next() else {
-            continue;
-        };
-        if token.is_empty() {
-            continue;
+        if let Some(token) = find_ttwid_cookie_header(value) {
+            return Ok(Some(token));
         }
-        return Ok(Some(token.to_string()));
     }
     Ok(None)
+}
+
+fn cookie_names(headers: &HeaderMap) -> String {
+    let names: Vec<String> = headers.get_all("set-cookie").iter()
+        .filter_map(|v| v.to_str().ok())
+        .filter_map(|v| v.split(';').next())
+        .filter_map(|v| v.split_once('=').map(|(name, _)| name.trim().to_string()))
+        .collect();
+    if names.is_empty() { "none".to_string() } else { names.join(",") }
+}
+
+fn cookie_names_from_header(value: &str) -> String {
+    let names: Vec<String> = value.split(';')
+        .filter_map(|part| part.trim().split_once('=').map(|(name, _)| name.trim().to_string()))
+        .collect();
+    if names.is_empty() { "none".to_string() } else { names.join(",") }
+}
+
+fn find_ttwid_cookie_header(value: &str) -> Option<String> {
+    value.split(';').find_map(|part| {
+        let (name, value) = part.trim().split_once('=')?;
+        if name.eq_ignore_ascii_case("ttwid") && !value.is_empty() {
+            Some(value.to_string())
+        } else {
+            None
+        }
+    })
 }

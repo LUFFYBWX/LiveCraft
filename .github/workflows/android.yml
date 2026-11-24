@@ -3,7 +3,12 @@ name: Build LiveCraft APK
 on:
   workflow_dispatch:
   push:
-    branches: [ "main", "feature/tiktok-rust-bridge", "fix/piratetok-event-stream" ]
+    branches: [ "main", "feature/tiktok-rust-bridge", "fix/piratetok-event-stream", "fix/tiktok-username-config", "feature/separate-connection-controls", "fix/live-search-crash", "diagnose/native-start-checkpoints", "feature/new-tiktok-gift-rules", "feature/gift-editor", "feature/text-overlay-from-133" ]
+  pull_request:
+    branches: [ "fix/piratetok-event-stream" ]
+
+permissions:
+  contents: write
 
 jobs:
   test-and-build:
@@ -47,3 +52,10 @@ jobs:
         with:
           name: LiveCraft-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+      - name: Publish direct APK download
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: gift-editor-build-${{ github.run_number }}
+          name: LiveCraft Gift Editor build ${{ github.run_number }}
+          files: app/build/outputs/apk/debug/app-debug.apk
+          make_latest: false
