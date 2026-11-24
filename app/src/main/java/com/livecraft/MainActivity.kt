@@ -17,6 +17,7 @@ class MainActivity : Activity() {
     private lateinit var generalStatus: TextView
     private lateinit var log: TextView
     private lateinit var tiktokUsername: EditText
+    private lateinit var mobModeButton: Button
     private var receiverRegistered = false
 
     private val receiver = object : BroadcastReceiver() {
@@ -81,6 +82,20 @@ class MainActivity : Activity() {
         root.addView(makeButton("PERSONALIZAR PRESENTES") {
             startActivity(Intent(this, GiftRulesActivity::class.java))
         })
+
+        mobModeButton = makeButton(
+            if (getSharedPreferences("livecraft", MODE_PRIVATE).getBoolean(GameBridgeService.KEY_MOB_MODE_ENABLED, false))
+                "DESATIVAR MODO MOBS" else "ATIVAR MODO MOBS"
+        ) {
+            val prefs = getSharedPreferences("livecraft", MODE_PRIVATE)
+            val enabled = !prefs.getBoolean(GameBridgeService.KEY_MOB_MODE_ENABLED, false)
+            prefs.edit().putBoolean(GameBridgeService.KEY_MOB_MODE_ENABLED, enabled).apply()
+            mobModeButton.text = if (enabled) "DESATIVAR MODO MOBS" else "ATIVAR MODO MOBS"
+            generalStatus.text = if (enabled)
+                "Modo Mobs ativado. O último mob comentado será invocado após 5 segundos."
+            else "Modo Mobs desativado."
+        }
+        root.addView(mobModeButton)
         root.addView(makeButton("SALVAR USUÁRIO") {
             val username = tiktokUsername.text.toString().trim().removePrefix("@").trim()
             if (username.isBlank()) {
