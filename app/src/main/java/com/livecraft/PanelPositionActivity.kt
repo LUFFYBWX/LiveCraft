@@ -211,7 +211,7 @@ class PanelPositionActivity : Activity() {
                 .putBoolean(FloatingOverlayService.KEY_TEXT, enabled).apply()
             textToggle.text = if (enabled) "TEXTO: ATIVADO" else "TEXTO: DESATIVADO"
         }
-        controlsPanel.addView(textToggle)
+        // Este botão fica dentro de um layout VERTICAL: não pode herdar\n        // os parâmetros horizontais (largura 0 + weight 1) dos botões inferiores.\n        controlsPanel.addView(textToggle, LinearLayout.LayoutParams(-1, dp(42)))
         root.addView(controlsPanel, LinearLayout.LayoutParams(-1, -2).apply {
             bottomMargin = dp(8)
         })
