@@ -92,10 +92,33 @@ class MainActivity : Activity() {
             prefs.edit().putBoolean(GameBridgeService.KEY_MOB_MODE_ENABLED, enabled).apply()
             mobModeButton.text = if (enabled) "DESATIVAR MODO MOBS" else "ATIVAR MODO MOBS"
             generalStatus.text = if (enabled)
-                "Modo Mobs ativado. O último mob comentado será invocado após 5 segundos."
+                "Modo Mobs ativado. O último mob comentado será invocado após o delay configurado."
             else "Modo Mobs desativado."
         }
         root.addView(mobModeButton)
+        root.addView(label("Delay do Modo Mobs (segundos)", 14f, Color.WHITE))
+        val mobDelayInput = EditText(this).apply {
+            hint = "1 a 60 segundos"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            setSingleLine(true)
+            setTextColor(Color.WHITE)
+            setHintTextColor(0xFF888888.toInt())
+            setText(getSharedPreferences("livecraft", MODE_PRIVATE)
+                .getInt(GameBridgeService.KEY_MOB_DELAY_SECONDS, GameBridgeService.DEFAULT_MOB_DELAY_SECONDS).toString())
+            background = roundedOutline(16, Color.BLACK, Color.WHITE)
+            setPadding(16, 12, 16, 12)
+        }
+        root.addView(mobDelayInput)
+        root.addView(makeButton("SALVAR DELAY") {
+            val seconds = mobDelayInput.text.toString().toIntOrNull()
+            if (seconds == null || seconds !in 1..60) {
+                generalStatus.text = "Delay inválido. Escolha entre 1 e 60 segundos."
+            } else {
+                getSharedPreferences("livecraft", MODE_PRIVATE).edit()
+                    .putInt(GameBridgeService.KEY_MOB_DELAY_SECONDS, seconds).apply()
+                generalStatus.text = "Delay do Modo Mobs salvo: $seconds segundos."
+            }
+        })
         root.addView(makeButton("SALVAR USUÁRIO") {
             val username = tiktokUsername.text.toString().trim().removePrefix("@").trim()
             if (username.isBlank()) {
