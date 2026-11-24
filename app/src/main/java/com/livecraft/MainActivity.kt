@@ -82,6 +82,9 @@ class MainActivity : Activity() {
         root.addView(makeButton("PERSONALIZAR PRESENTES") {
             startActivity(Intent(this, GiftRulesActivity::class.java))
         })
+        root.addView(makeButton("CONFIGURAR META DE LIKES ❤️") {
+            startActivity(Intent(this, LikeGoalActivity::class.java))
+        })
 
         mobModeButton = makeButton(
             if (getSharedPreferences("livecraft", MODE_PRIVATE).getBoolean(GameBridgeService.KEY_MOB_MODE_ENABLED, false))
