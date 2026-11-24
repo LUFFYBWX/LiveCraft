@@ -51,6 +51,7 @@ class PanelPositionActivity : Activity() {
         }
         val stageParams = LinearLayout.LayoutParams(-1, 0, 1f).apply { topMargin = dp(10); bottomMargin = dp(10) }
         root.addView(stage, stageParams)
+        val prefs = getSharedPreferences("livecraft", MODE_PRIVATE)
         preview = buildPreview()
         val previewParams = FrameLayout.LayoutParams(dp(270), dp(210), Gravity.TOP or Gravity.START)
         stage.addView(preview, previewParams)
@@ -101,7 +102,6 @@ class PanelPositionActivity : Activity() {
                 else -> true
             }
         }
-        val prefs = getSharedPreferences("livecraft", MODE_PRIVATE)
         val textControls = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         overlayTextInput = EditText(this).apply {
             hint = "Texto flutuante"
