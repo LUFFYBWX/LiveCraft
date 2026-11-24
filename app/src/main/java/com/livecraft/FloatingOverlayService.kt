@@ -133,7 +133,6 @@ class FloatingOverlayService : Service() {
         panelGiftIndex = panelGiftIndex.coerceIn(0, totalEntries - 1)
         if (showLikeGoal && panelGiftIndex == rules.size) {
             val target = prefs().getInt(GameBridgeService.KEY_LIKE_GOAL_TARGET, GameBridgeService.DEFAULT_LIKE_GOAL_TARGET).coerceIn(1, 1_000_000)
-            val progress = prefs().getLong(GameBridgeService.KEY_LIKE_GOAL_PROGRESS, 0L).coerceAtLeast(0L) % target
             val actionType = prefs().getString(GameBridgeService.KEY_LIKE_GOAL_ACTION_TYPE, "COMMAND").orEmpty()
             val actionValue = prefs().getString(GameBridgeService.KEY_LIKE_GOAL_ACTION_VALUE, "spawn_zombie").orEmpty()
             val actionName = when (actionType) {
@@ -148,8 +147,7 @@ class FloatingOverlayService : Service() {
                 layoutParams = LinearLayout.LayoutParams(dp(42), dp(42))
             })
             val texts = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(9), 0, 0, 0) }
-            texts.addView(panelText("Meta: $progress / $target likes", 13f, Color.WHITE, true))
-            texts.addView(panelText("$target ❤️ = $actionName", 11f, 0xFFCCCCCC.toInt()))
+            texts.addView(panelText("$target ❤️ = $actionName", 13f, Color.WHITE, true))
             outer.addView(texts, LinearLayout.LayoutParams(0, -2, 1f))
             return outer
         }
