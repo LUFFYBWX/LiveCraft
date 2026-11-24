@@ -234,23 +234,25 @@ class GameBridgeService : Service() {
         val safeUser = username.replace('\r', ' ').replace('\n', ' ').take(32)
         val safeComment = comment.replace('\r', ' ').replace('\n', ' ').take(180)
         if (safeComment.isBlank()) return false
+        var detectedMob: String? = null
         if (getSharedPreferences("livecraft", MODE_PRIVATE).getBoolean(KEY_MOB_MODE_ENABLED, false)) {
             val mob = MobCatalog.findMob(safeComment)
+            detectedMob = mob
             if (mob != null) {
                 mobHandler.post {
                     val startWindow = pendingMob == null
                     pendingMob = mob
                     if (startWindow) mobHandler.postDelayed(spawnPendingMob, MOB_SPAWN_DELAY_MS)
                 }
-                update("Modo Mobs: ${mob.replace('_', ' ')} detectado. Aguardando 5 segundos...", "$safeUser comentou um mob: $mob")
             }
         }
         val text = "§b[$safeUser] §f$safeComment"
         val raw = JSONObject().put("rawtext", org.json.JSONArray().put(JSONObject().put("text", text)))
         val sent = sendCommand("tellraw @a $raw")
         update(
-            if (sent) "Comentário recebido: $safeUser" else "Comentário recebido, mas Minecraft desconectado",
-            "$safeUser: $safeComment"
+            if (detectedMob != null) "Modo Mobs: ${detectedMob.replace('_', ' ')} detectado. Aguardando o intervalo de 5 segundos..."
+            else if (sent) "Comentário recebido: $safeUser" else "Comentário recebido, mas Minecraft desconectado",
+            if (detectedMob != null) "$safeUser: $safeComment → mob: $detectedMob" else "$safeUser: $safeComment"
         )
         return sent
     }
