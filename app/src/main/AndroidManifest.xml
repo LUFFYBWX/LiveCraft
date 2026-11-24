@@ -22,6 +22,7 @@
             </intent-filter>
         </activity>
         <activity android:name=".GiftRulesActivity" android:exported="false" />
+        <activity android:name=".LikeGoalActivity" android:exported="false" />
         <activity android:name=".PanelPositionActivity" android:exported="false" android:screenOrientation="landscape" />
         <service
             android:name=".FloatingOverlayService"
