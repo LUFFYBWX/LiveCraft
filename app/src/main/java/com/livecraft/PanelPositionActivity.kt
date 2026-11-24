@@ -31,26 +31,40 @@ class PanelPositionActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(14), dp(10), dp(14), dp(10))
-            setBackgroundColor(Color.BLACK)
-        }
-        root.addView(TextView(this).apply {
-            text = "POSICIONE O PAINEL DE PRESENTES"
-            textSize = 18f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.WHITE)
-        })
-        root.addView(TextView(this).apply {
-            text = "Arraste o retângulo para escolher onde ele ficará durante a live."
-            textSize = 13f; setTextColor(0xFFCCCCCC.toInt())
-        })
+        // Editor imersivo: a área de arraste corresponde à tela inteira.
+        @Suppress("DEPRECATION")
+        window.decorView.systemUiVisibility = (
+            View.SYSTEM_UI_FLAG_FULLSCREEN or
+            View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+            View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
+            View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+            View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+        )
+        val root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
         stage = FrameLayout(this).apply {
+            setBackgroundColor(0xFF242424.toInt())
+        }
+        root.addView(stage, FrameLayout.LayoutParams(-1, -1))
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(14), dp(8), dp(14), dp(8))
             background = GradientDrawable().apply {
-                setColor(0xFF242424.toInt()); setStroke(dp(1), 0xFF777777.toInt()); cornerRadius = dp(12).toFloat()
+                setColor(0xAA000000.toInt()); cornerRadius = dp(10).toFloat()
+                setStroke(dp(1), 0xFF777777.toInt())
             }
         }
-        val stageParams = LinearLayout.LayoutParams(-1, 0, 1f).apply { topMargin = dp(10); bottomMargin = dp(10) }
-        root.addView(stage, stageParams)
+        header.addView(TextView(this).apply {
+            text = "POSICIONE O PAINEL DE PRESENTES"
+            textSize = 16f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.WHITE)
+        })
+        header.addView(TextView(this).apply {
+            text = "Arraste os elementos livremente por toda a tela."
+            textSize = 12f; setTextColor(0xFFCCCCCC.toInt())
+        })
+        root.addView(header, FrameLayout.LayoutParams(-1, -2, Gravity.TOP).apply {
+            setMargins(dp(10), dp(8), dp(10), 0)
+        })
         val prefs = getSharedPreferences("livecraft", MODE_PRIVATE)
         preview = buildPreview()
         val previewParams = FrameLayout.LayoutParams(dp(270), dp(210), Gravity.TOP or Gravity.START)
@@ -145,7 +159,15 @@ class PanelPositionActivity : Activity() {
         val controlsParams = LinearLayout.LayoutParams(-1, -2).apply {
             topMargin = dp(2); bottomMargin = dp(6)
         }
-        root.addView(controlsPanel, controlsParams)
+        val bottomControls = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(8), dp(6), dp(8), dp(6))
+            background = GradientDrawable().apply {
+                setColor(0xCC000000.toInt()); cornerRadius = dp(12).toFloat()
+                setStroke(dp(1), 0xFF777777.toInt())
+            }
+        }
+        bottomControls.addView(controlsPanel, controlsParams)
         val buttons = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         buttons.addView(makeButton("SALVAR E ATIVAR", 1f) {
             val maxX = (stage.width - preview.width).coerceAtLeast(1)
@@ -172,7 +194,10 @@ class PanelPositionActivity : Activity() {
             finish()
         })
         buttons.addView(makeButton("VOLTAR", 1f) { finish() })
-        root.addView(buttons)
+        bottomControls.addView(buttons)
+        root.addView(bottomControls, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply {
+            setMargins(dp(8), 0, dp(8), dp(8))
+        })
         setContentView(root)
     }
 
